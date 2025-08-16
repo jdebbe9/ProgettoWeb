@@ -1,0 +1,7 @@
+:root { --max: 1100px; }
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; font-family: Inter, system-ui, Arial, sans-serif; }
+.container { max-width: var(--max); margin: 0 auto; padding: 16px; }
+.stack { display: grid; gap: 16px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

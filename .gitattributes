@@ -1,0 +1,12 @@
+(
+echo * text=auto
+echo *.js   text eol=lf
+echo *.jsx  text eol=lf
+echo *.ts   text eol=lf
+echo *.tsx  text eol=lf
+echo *.json text eol=lf
+echo *.css  text eol=lf
+echo *.md   text eol=lf
+echo *.sh   text eol=lf
+echo *.bat  text eol=crlf
+) > .gitattributes
