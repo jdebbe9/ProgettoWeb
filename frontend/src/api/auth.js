@@ -65,5 +65,20 @@ export async function refresh() {
   return data
 }
 
+/* ---------------- Password recovery ---------------- */
+
+export async function forgotPassword(email) {
+  const { data } = await api.post('/auth/forgot-password', { email })
+  // in dev il backend può restituire anche { devResetUrl }
+  return data
+}
+
+export async function resetPassword({ token, password }) {
+  const { data } = await api.post('/auth/reset-password', { token, password })
+  return data
+}
+
+
+
 
 

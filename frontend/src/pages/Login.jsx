@@ -3,12 +3,9 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Alert, Box, Button, MenuItem, Paper, TextField, Typography
-} from '@mui/material'
+import { Alert, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { me } from '../api/auth'
 
 const schema = z.object({
   email: z.string().email('Email non valida'),
@@ -25,7 +22,6 @@ export default function Login() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  // se già autenticato, vai alla dashboard corretta
   useEffect(() => {
     if (user) {
       navigate(user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard', { replace: true })
@@ -35,15 +31,10 @@ export default function Login() {
   const onSubmit = async ({ email, password, role }) => {
     setError('')
     try {
-      await login(email, password)              // autentica
-      const data = await me()                   // ruolo effettivo dal server
-      const finalRole = data?.user?.role
-      if (!finalRole) { setError('Impossibile determinare il ruolo dell’account.'); return }
-      if (finalRole !== role) {
-        setError(`Questo account è di tipo "${finalRole}", non "${role}".`)
-        return
-      }
-      navigate(role === 'therapist' ? '/therapist/dashboard' : '/dashboard')
+      const u = await login(email, password) // ritorna l’utente
+      if (!u) { setError('Impossibile determinare il ruolo.'); return }
+      if (u.role !== role) { setError(`Questo account è di tipo "${u.role}", non "${role}".`); return }
+      navigate(u.role === 'therapist' ? '/therapist/dashboard' : '/dashboard')
     } catch {
       setError('Credenziali non valide.')
     }
@@ -81,11 +72,15 @@ export default function Login() {
 
         <Typography sx={{ mt: 2 }} variant="body2">
           Non hai un account? <Link to="/register">Registrati</Link>
+          {' · '}
+          <Link to="/forgot-password">Password dimenticata?</Link>
         </Typography>
       </Paper>
     </Box>
   )
 }
+
+
 
 
 

@@ -1,57 +1,54 @@
-// src/pages/Appointments.jsx
-import { useEffect, useState } from 'react'
-import {
-  Alert, Box, Button, IconButton, Paper, TextField, Typography
-} from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
-import { createAppointment, listAppointments, cancelAppointment } from '../api/appointments'
+import { useEffect, useState } from 'react';
+import { Alert, Box, Button, IconButton, Paper, TextField, Typography } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuth } from '../context/AuthContext';
+import { createAppointment, listAppointments, cancelAppointment } from '../api/appointments';
 
-const THERAPIST_ID = import.meta.env.VITE_THERAPIST_ID
-const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta'
+const THERAPIST_ID = import.meta.env.VITE_THERAPIST_ID;
+const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta';
 
 export default function Appointments() {
-  const [items, setItems] = useState([])
-  const [date, setDate] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const { user, loading: authLoading } = useAuth();
+  const [items, setItems] = useState([]);
+  const [date, setDate] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
-    setError(''); setLoading(true)
+    setError(''); setLoading(true);
     try {
-      const data = await listAppointments()
-      setItems(Array.isArray(data) ? data : [])
-    } catch {
-      setError('Errore caricamento appuntamenti.')
-    } finally {
-      setLoading(false)
-    }
+      const data = await listAppointments();
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore caricamento appuntamenti.');
+    } finally { setLoading(false); }
   }
-  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!authLoading && user) load();
+  }, [authLoading, user]);
 
   async function onCreate(e) {
-    e.preventDefault()
-    setError(''); setSubmitting(true)
+    e.preventDefault();
+    setError(''); setSubmitting(true);
     try {
-      // Adatta il nome campo se il backend usa "therapist" invece di "therapistId"
-      await createAppointment({ date, therapistId: THERAPIST_ID })
-      setDate('')
-      await load()
-    } catch (err) {
-      const msg = err?.response?.data?.message || 'Errore creazione appuntamento.'
-      setError(msg)
-    } finally {
-      setSubmitting(false)
-    }
+      await createAppointment({ date, therapistId: THERAPIST_ID });
+      setDate('');
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore creazione appuntamento.');
+    } finally { setSubmitting(false); }
   }
 
   async function onCancel(id) {
-    setError('')
-    try { await cancelAppointment(id); await load() } catch { setError('Errore cancellazione.') }
+    setError('');
+    try { await cancelAppointment(id); await load(); }
+    catch (e) { setError(e?.response?.data?.message || 'Errore cancellazione.'); }
   }
 
   return (
-    <Box className="container" sx={{ mt: 3 }}>
+    <Box className="container" sx={{ mt: 3, maxWidth: 720 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Appuntamenti</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -60,13 +57,13 @@ export default function Appointments() {
           <TextField
             type="datetime-local"
             label="Data e ora"
+            InputLabelProps={{ shrink: true }}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
             required
           />
           <Button type="submit" variant="contained" disabled={submitting || !date}>
-            {submitting ? 'Creo…' : 'Prenota con ' + THERAPIST_NAME}
+            {submitting ? 'Creo…' : `Prenota con ${THERAPIST_NAME}`}
           </Button>
         </form>
         <Typography variant="body2" sx={{ mt: 1, opacity: .8 }}>
@@ -80,16 +77,16 @@ export default function Appointments() {
             <div>
               <Typography>Data: {a.date ? new Date(a.date).toLocaleString() : '—'}</Typography>
               <Typography variant="body2" sx={{ opacity: .8 }}>
-                Terapeuta: {a.therapist?.name || THERAPIST_NAME}
+                Stato: {a.status || 'pending'}
               </Typography>
             </div>
-            <IconButton onClick={() => onCancel(a._id)} aria-label="Cancella"><DeleteIcon /></IconButton>
+            <IconButton aria-label="Cancella" onClick={() => onCancel(a._id)}><DeleteIcon /></IconButton>
           </Paper>
         ))}
         {!loading && items.length === 0 && <Typography>Nessun appuntamento.</Typography>}
       </div>
     </Box>
-  )
+  );
 }
 
 

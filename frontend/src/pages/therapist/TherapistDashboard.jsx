@@ -1,124 +1,253 @@
 // src/pages/therapist/TherapistDashboard.jsx
 import { useEffect, useState } from 'react'
 import {
-  Alert, Box, Button, Divider, IconButton, Paper, TextField, Typography
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  IconButton, Paper, Stack, TextField, Typography
 } from '@mui/material'
 import CheckIcon from '@mui/icons-material/Check'
-import EditCalendarIcon from '@mui/icons-material/EditCalendar'
-import { listAppointments, updateAppointment } from '../../api/appointments'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import { useAuth } from '../../context/AuthContext'
+import {
+  listAppointments,
+  updateAppointment,
+  cancelAppointment
+} from '../../api/appointments'
+
+function formatDT(d) {
+  try { return new Date(d).toLocaleString() } catch { return '—' }
+}
 
 export default function TherapistDashboard() {
+  const { user, loading: authLoading } = useAuth()
   const [items, setItems] = useState([])
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [newDate, setNewDate] = useState('')
+  const [error, setError] = useState('')
+
+  // selezione paziente (per sezioni Diario/Questionario)
+  const [selectedPatient, setSelectedPatient] = useState(null)
+
+  // dialog riprogrammazione
+  const [reschedOpen, setReschedOpen] = useState(false)
+  const [reschedId, setReschedId] = useState(null)
+  const [reschedDate, setReschedDate] = useState('')
+
+  // modali placeholder Diario/Questionario
+  const [openDiary, setOpenDiary] = useState(false)
+  const [openQuest, setOpenQuest] = useState(false)
 
   async function load() {
-    setError(''); setLoading(true)
+    setError('')
+    setLoading(true)
     try {
-      const data = await listAppointments() // lato backend filtra per terapeuta loggato
+      const data = await listAppointments()   // il server filtra per therapist = utente loggato
       setItems(Array.isArray(data) ? data : [])
-    } catch {
-      setError('Errore nel caricamento degli appuntamenti.')
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore caricamento appuntamenti.')
+    } finally { setLoading(false) }
   }
-  useEffect(() => { load() }, [])
 
-  async function accept(id) {
+  useEffect(() => {
+    if (!authLoading && user?.role === 'therapist') load()
+  }, [authLoading, user])
+
+  async function onAccept(id) {
+    setError('')
     try {
       await updateAppointment(id, { status: 'accepted' })
-      load()
-    } catch { setError('Errore durante l’accettazione.') }
+      await load()
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore durante l’accettazione.')
+    }
   }
 
-  async function reschedule(id) {
-    if (!newDate) return
+  function openReschedule(id, currentDate) {
+    setReschedId(id)
+    const dt = new Date(currentDate || Date.now())
+    const pad = (n) => String(n).padStart(2, '0')
+    const v = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+    setReschedDate(v)
+    setReschedOpen(true)
+  }
+
+  async function confirmReschedule() {
+    if (!reschedId || !reschedDate) return
+    setError('')
     try {
-      await updateAppointment(id, { date: newDate })
-      setEditingId(null); setNewDate('')
-      load()
-    } catch { setError('Errore nella riprogrammazione.') }
+      await updateAppointment(reschedId, { date: reschedDate })
+      setReschedOpen(false)
+      setReschedId(null)
+      setReschedDate('')
+      await load()
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore durante la riprogrammazione.')
+    }
+  }
+
+  async function onCancel(id) {
+    setError('')
+    try {
+      await cancelAppointment(id)
+      // se cancelli quello selezionato, togli la selezione
+      if (items.find(x => x._id === id)?.patient?._id === selectedPatient?._id) {
+        setSelectedPatient(null)
+      }
+      await load()
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore durante la cancellazione.')
+    }
   }
 
   return (
-    <Box className="container" sx={{ mt: 3 }}>
+    <Box className="container" sx={{ mt: 3, maxWidth: 980 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Dashboard Terapeuta</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      {/* --- Appuntamenti --- */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Appuntamenti</Typography>
-        <Divider sx={{ mb: 2 }} />
-        <div className="stack">
-          {items.map(a => (
-            <Paper key={a._id} sx={{ p: 2 }}>
-              <Typography>
-                Paziente: {a.patient?.name || a.patientName || a.patientEmail || '—'}
-              </Typography>
-              <Typography>
-                Data: {a.date ? new Date(a.date).toLocaleString() : '—'}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: .8 }}>
-                Stato: {a.status || 'pending'}
-              </Typography>
+        <Typography variant="h6" sx={{ mb: .5 }}>Appuntamenti</Typography>
+        <Typography variant="body2" sx={{ opacity: .8, mb: 1 }}>
+          Seleziona un appuntamento per attivare le sezioni Diario/Questionario del paziente.
+        </Typography>
 
-              <Box className="row" sx={{ mt: 1 }}>
-                <Button
-                  size="small"
-                  startIcon={<CheckIcon />}
-                  onClick={() => accept(a._id)}
-                  disabled={a.status === 'accepted'}
-                >
-                  Accetta
-                </Button>
+        {!loading && items.length === 0 && (
+          <Typography sx={{ opacity: .8 }}>Nessun appuntamento.</Typography>
+        )}
 
-                {editingId === a._id ? (
-                  <>
-                    <TextField
-                      type="datetime-local"
-                      value={newDate}
-                      onChange={(e) => setNewDate(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
+        <Stack spacing={1.5}>
+          {items.map(a => {
+            const isSelected = selectedPatient?._id && a.patient?._id === selectedPatient._id
+            return (
+              <Paper
+                key={a._id}
+                onClick={() => setSelectedPatient(a.patient || null)}
+                sx={{
+                  p: 1.5, display: 'flex', alignItems: 'center', gap: 2,
+                  border: '1px solid',
+                  borderColor: isSelected ? 'primary.main' : 'divider',
+                  cursor: 'pointer'
+                }}
+                title="Click per selezionare questo paziente"
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    {a.patient?.name || a.patient?.email || 'Paziente'}
+                    {isSelected && <Typography component="span" sx={{ ml: 1, fontSize: 12, opacity: .7 }}>(selezionato)</Typography>}
+                  </Typography>
+                  <Typography variant="body2">Data: {formatDT(a.date)}</Typography>
+                  <Typography variant="body2" sx={{ opacity: .8 }}>
+                    Stato: {a.status || 'pending'}
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1}>
+                  {a.status !== 'accepted' && (
+                    <Button
                       size="small"
-                    />
-                    <Button size="small" onClick={() => reschedule(a._id)}>Salva</Button>
-                    <Button size="small" onClick={() => { setEditingId(null); setNewDate('') }}>Annulla</Button>
-                  </>
-                ) : (
+                      startIcon={<CheckIcon />}
+                      onClick={(e) => { e.stopPropagation(); onAccept(a._id) }}
+                    >
+                      Accetta
+                    </Button>
+                  )}
                   <Button
                     size="small"
-                    startIcon={<EditCalendarIcon />}
-                    onClick={() => { setEditingId(a._id); setNewDate('') }}
+                    startIcon={<EditIcon />}
+                    onClick={(e) => { e.stopPropagation(); openReschedule(a._id, a.date) }}
                   >
                     Riprogramma
                   </Button>
-                )}
-              </Box>
-            </Paper>
-          ))}
-
-          {!loading && items.length === 0 && (
-            <Typography>Nessun appuntamento.</Typography>
-          )}
-        </div>
+                  <IconButton aria-label="Cancella" onClick={(e) => { e.stopPropagation(); onCancel(a._id) }}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Stack>
+              </Paper>
+            )
+          })}
+        </Stack>
       </Paper>
 
-      <Paper sx={{ p: 2 }}>
+      {/* --- Diario (lettura) --- */}
+      <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Diario (lettura)</Typography>
-        <Typography variant="body2" sx={{ opacity: .8 }}>
-          Placeholder: qui il terapeuta potrà leggere il diario del paziente
-          selezionato (endpoint necessario dal backend). Al momento mostra solo questa nota.
+        <Typography variant="body2" sx={{ opacity: .8, mb: 1 }}>
+          Seleziona un appuntamento/paziente e poi clicca “Vedi diario”.
         </Typography>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Typography variant="h6" sx={{ mb: 1 }}>Questionario iniziale</Typography>
-        <Typography variant="body2" sx={{ opacity: .8 }}>
-          Placeholder: qui si visualizzerà il questionario iniziale inviato dal paziente.
-        </Typography>
+        <Button
+          variant="outlined"
+          disabled={!selectedPatient}
+          onClick={() => setOpenDiary(true)}
+        >
+          Vedi diario del paziente
+        </Button>
       </Paper>
+
+      {/* --- Questionario iniziale (lettura) --- */}
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Questionario iniziale</Typography>
+        <Typography variant="body2" sx={{ opacity: .8, mb: 1 }}>
+          Seleziona un appuntamento/paziente e poi clicca “Vedi questionario”.
+        </Typography>
+        <Button
+          variant="outlined"
+          disabled={!selectedPatient}
+          onClick={() => setOpenQuest(true)}
+        >
+          Vedi questionario del paziente
+        </Button>
+      </Paper>
+
+      {/* Dialog riprogrammazione */}
+      <Dialog open={reschedOpen} onClose={() => setReschedOpen(false)}>
+        <DialogTitle>Riprogramma appuntamento</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <TextField
+            type="datetime-local"
+            label="Nuova data e ora"
+            InputLabelProps={{ shrink: true }}
+            value={reschedDate}
+            onChange={(e) => setReschedDate(e.target.value)}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReschedOpen(false)}>Annulla</Button>
+          <Button onClick={confirmReschedule} variant="contained">Salva</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modale Diario - placeholder */}
+      <Dialog open={openDiary} onClose={() => setOpenDiary(false)} fullWidth maxWidth="md">
+        <DialogTitle>Diario – {selectedPatient?.name || selectedPatient?.email || 'Paziente'}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Qui verranno mostrati i contenuti del diario del paziente (solo lettura).
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: .8 }}>
+            Endpoint da collegare: GET /api/diary?patientId=... (visibile solo al terapeuta).
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDiary(false)}>Chiudi</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modale Questionario - placeholder */}
+      <Dialog open={openQuest} onClose={() => setOpenQuest(false)} fullWidth maxWidth="md">
+        <DialogTitle>Questionario iniziale – {selectedPatient?.name || selectedPatient?.email || 'Paziente'}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Qui verranno mostrati i dati del questionario iniziale del paziente.
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: .8 }}>
+            Endpoint da collegare: GET /api/questionnaire?patientId=... (solo terapeuta).
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenQuest(false)}>Chiudi</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
+

@@ -9,8 +9,12 @@ import Appointments from '../pages/Appointments'
 import Questionnaire from '../pages/Questionnaire'
 import NotFound from '../pages/NotFound'
 import ProtectedRoute from '../components/ProtectedRoute'
-import Privacy from '../pages/Privacy'
 import TherapistDashboard from '../pages/therapist/TherapistDashboard'
+import Privacy from '../pages/Privacy' // se non ce l'hai, rimuovi questa riga e la route /privacy
+
+// 👇 nuove pagine per il recupero password
+import ForgotPassword from '../pages/ForgotPassword'
+import ResetPassword from '../pages/ResetPassword'
 
 export const router = createBrowserRouter([
   {
@@ -21,20 +25,24 @@ export const router = createBrowserRouter([
       { index: true, element: <Login /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
-      { path: 'privacy', element: <Privacy /> },
+      { path: 'privacy', element: <Privacy /> }, // opzionale
 
-      // paziente
+      // 👇 rotte pubbliche per recupero password
+      { path: 'forgot-password', element: <ForgotPassword /> },
+      { path: 'reset-password',  element: <ResetPassword /> },
+
+      // area utente (paziente/terapeuta per parti condivise)
       {
-        element: <ProtectedRoute roles={['patient','therapist']} />, // permette accesso base
+        element: <ProtectedRoute roles={['patient', 'therapist']} />,
         children: [
-          { path: 'dashboard', element: <Dashboard /> }, // dashboard paziente
+          { path: 'dashboard', element: <Dashboard /> },
           { path: 'diary', element: <Diary /> },
           { path: 'appointments', element: <Appointments /> },
           { path: 'questionnaire', element: <Questionnaire /> }
         ]
       },
 
-      // terapista
+      // area terapeuta
       {
         path: 'therapist',
         element: <ProtectedRoute roles={['therapist']} />,
@@ -45,5 +53,7 @@ export const router = createBrowserRouter([
     ]
   }
 ])
+
+
 
 
