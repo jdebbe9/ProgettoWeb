@@ -1,82 +1,51 @@
 // src/api/auth.js
 import api, { setAccessToken } from './client'
 
-export async function register(payload) {
-  const {
-    name, surname, birthDate, email, password, consent,
-    parentFirstName, parentLastName, parentEmail, parentPhone, parentConsent,
-    isMinor
-  } = payload
-
-  const consentBool = !!consent
-  const parentConsentBool = !!parentConsent
-
-  const body = {
-    name,
-    email,
-    password,
-
-    // anagrafica
-    surname, lastName: surname, cognome: surname,
-    birthDate, dob: birthDate, dataNascita: birthDate,
-
-    // minore
-    isMinor: !!isMinor,
-
-    // consenso proprio
-    consent: consentBool, privacyConsent: consentBool, consenso: consentBool, termsAccepted: consentBool,
-
-    // dati e consenso del genitore/tutore (varie chiavi per compatibilità)
-    parent: {
-      firstName: parentFirstName,
-      lastName: parentLastName,
-      email: parentEmail,
-      phone: parentPhone,
-      consent: parentConsentBool
-    },
-    parentFirstName, parentLastName, parentEmail, parentPhone,
-    parentConsent: parentConsentBool,
-    guardianConsent: parentConsentBool
-  }
-
-  const { data } = await api.post('/auth/register', body)
-  return data
-}
-
-export async function login(email, password) {
+// LOGIN
+export async function login({ email, password }) {
   const { data } = await api.post('/auth/login', { email, password })
   if (data?.accessToken) setAccessToken(data.accessToken)
-  return data
+  return data?.user || data
 }
 
+// LOGOUT
+export async function logout() {
+  try {
+    await api.post('/auth/logout')
+  } finally {
+    setAccessToken(null)
+  }
+}
+
+// ME
 export async function me() {
   const { data } = await api.get('/auth/me')
-  return data
+  return data?.user || data
 }
 
-export async function logout() {
-  await api.post('/auth/logout')
-  setAccessToken(null)
-}
-
+// REFRESH
 export async function refresh() {
-  const { data } = await api.post('/auth/refresh')
+  const { data } = await api.post('/auth/refresh', {})
   if (data?.accessToken) setAccessToken(data.accessToken)
   return data
 }
 
-/* ---------------- Password recovery ---------------- */
-
-export async function forgotPassword(email) {
-  const { data } = await api.post('/auth/forgot-password', { email })
-  // in dev il backend può restituire anche { devResetUrl }
+// REGISTER (paziente)
+export async function register(payload) {
+  const { data } = await api.post('/auth/register', payload)
   return data
 }
 
+// PASSWORD RESET
+export async function forgotPassword(email) {
+  const { data } = await api.post('/auth/forgot-password', { email })
+  return data
+}
 export async function resetPassword({ token, password }) {
   const { data } = await api.post('/auth/reset-password', { token, password })
   return data
 }
+
 
 
 

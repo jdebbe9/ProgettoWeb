@@ -61,11 +61,14 @@ app.use(notFound);
 app.use(errorHandler);
 
 /* ----------------------- SEED TERAPEUTA UNICO ----------------------- */
+
 async function ensureTherapistAccount() {
   try {
-    const email = process.env.THERAPIST_EMAIL;
-    const password = process.env.THERAPIST_PASSWORD;
-    const name = process.env.THERAPIST_NAME || 'Terapeuta';
+    const email     = process.env.THERAPIST_EMAIL;
+    const password  = process.env.THERAPIST_PASSWORD;
+    const name      = process.env.THERAPIST_NAME     || 'Terapeuta';
+    const surname   = process.env.THERAPIST_SURNAME  || 'Unico';
+    const birthDate = process.env.THERAPIST_BIRTHDATE|| '1980-01-01';
 
     if (!email || !password) {
       console.warn('[seed] THERAPIST_EMAIL/THERAPIST_PASSWORD non impostati. Seed terapeuta saltato.');
@@ -78,14 +81,16 @@ async function ensureTherapistAccount() {
     if (!user) {
       user = await User.create({
         name,
+        surname,
+        birthDate: new Date(birthDate),
         email,
         role: 'therapist',
         approved: true,
-        passwordHash: hash,
-        // se il tuo schema usa "password" come hash, lo popoliamo comunque:
-        password: hash,
 
-        // campi richiesti dal tuo schema
+        // password hash (compatibile con schemi che usano passwordHash o password)
+        passwordHash: hash,
+        password:     hash,
+
         privacyConsent: true,
         consentGivenAt: new Date()
       });
@@ -96,15 +101,16 @@ async function ensureTherapistAccount() {
       if (user.role !== 'therapist') { user.role = 'therapist'; changed = true; }
       if (user.approved !== true)    { user.approved = true;    changed = true; }
 
-      // se manca il consenso, impostalo (fix per validation error)
-      if (!user.consentGivenAt) { user.consentGivenAt = new Date(); changed = true; }
-      if (user.privacyConsent !== true) { user.privacyConsent = true; changed = true; }
+      if (!user.name)               { user.name = name;                         changed = true; }
+      if (!user.surname)            { user.surname = surname;                   changed = true; }
+      if (!user.birthDate)          { user.birthDate = new Date(birthDate);     changed = true; }
+      if (!user.consentGivenAt)     { user.consentGivenAt = new Date();         changed = true; }
+      if (user.privacyConsent !== true) { user.privacyConsent = true;           changed = true; }
 
       // aggiorna password se differente
       let same = false;
-      try {
-        same = await bcrypt.compare(password, user.passwordHash || user.password || '');
-      } catch { same = false; }
+      try { same = await bcrypt.compare(password, user.passwordHash || user.password || ''); }
+      catch { same = false; }
       if (!same) {
         user.passwordHash = hash;
         try { user.password = hash; } catch {}
@@ -119,7 +125,7 @@ async function ensureTherapistAccount() {
       }
     }
 
-    console.log(`[seed] Usa questo id nel frontend (.env): VITE_THERAPIST_ID=${user._id}`);
+    console.log(`[seed] Usa questo id nel frontend (.env se serve): VITE_THERAPIST_ID=${user._id}`);
   } catch (e) {
     console.error('[seed] Errore seed terapeuta:', e);
   }

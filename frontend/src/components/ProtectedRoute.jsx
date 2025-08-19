@@ -13,8 +13,13 @@ export default function ProtectedRoute({ roles }) {
       </Box>
     )
   }
+
   if (!user) return <Navigate to="/login" replace />
-  if (roles && !roles.includes(user.role)) return <Navigate to="/login" replace />
+
+  if (roles && !roles.includes(user.role)) {
+    const target = user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard'
+    return <Navigate to={target} replace />
+  }
 
   return <Outlet />
 }

@@ -1,3 +1,4 @@
+// src/App.jsx
 import { Outlet, useLocation, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import { useAuth } from './context/AuthContext'
@@ -7,9 +8,10 @@ export default function App() {
   const { user } = useAuth()
   const { pathname } = useLocation()
 
-  // Se l'utente è loggato e va a /, portalo in /dashboard
+  // Se l'utente è loggato e va a /, portalo nella dashboard corretta
   if (user && pathname === '/') {
-    return <Navigate to="/dashboard" replace />
+    const target = user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard'
+    return <Navigate to={target} replace />
   }
 
   return (
@@ -21,4 +23,5 @@ export default function App() {
     </>
   )
 }
+
 

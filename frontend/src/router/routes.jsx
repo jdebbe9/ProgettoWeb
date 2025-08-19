@@ -1,9 +1,8 @@
 // src/router/routes.jsx
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import App from '../App'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
-import Home from '../pages/Home';
 import Dashboard from '../pages/Dashboard'
 import Diary from '../pages/Diary'
 import Appointments from '../pages/Appointments'
@@ -11,11 +10,10 @@ import Questionnaire from '../pages/Questionnaire'
 import NotFound from '../pages/NotFound'
 import ProtectedRoute from '../components/ProtectedRoute'
 import TherapistDashboard from '../pages/therapist/TherapistDashboard'
-import Privacy from '../pages/Privacy' // se non ce l'hai, rimuovi questa riga e la route /privacy
-
-// 👇 nuove pagine per il recupero password
+import Privacy from '../pages/Privacy'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
+import Home from '../pages/Home'
 
 export const router = createBrowserRouter([
   {
@@ -26,20 +24,18 @@ export const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
-      { path: 'privacy', element: <Privacy /> }, // opzionale
-
-      // 👇 rotte pubbliche per recupero password
+      { path: 'privacy', element: <Privacy /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
-      { path: 'reset-password',  element: <ResetPassword /> },
+      { path: 'reset-password/:token', element: <ResetPassword /> },
 
-      // area utente (paziente/terapeuta per parti condivise)
+      // area utente (paziente)
       {
-        element: <ProtectedRoute roles={['patient', 'therapist']} />,
+        element: <ProtectedRoute roles={['patient']} />,
         children: [
-          { path: 'dashboard', element: <Dashboard /> },
-          { path: 'diary', element: <Diary /> },
-          { path: 'appointments', element: <Appointments /> },
-          { path: 'questionnaire', element: <Questionnaire /> }
+          { path: 'dashboard',     element: <Dashboard /> },
+          { path: 'diary',         element: <Diary /> },
+          { path: 'appointments',  element: <Appointments /> },
+          { path: 'questionnaire', element: <Questionnaire /> },
         ]
       },
 
@@ -48,12 +44,15 @@ export const router = createBrowserRouter([
         path: 'therapist',
         element: <ProtectedRoute roles={['therapist']} />,
         children: [
-          { path: 'dashboard', element: <TherapistDashboard /> }
+          { index: true,           element: <Navigate to="dashboard" replace /> },
+          { path: 'dashboard',     element: <TherapistDashboard /> }
         ]
       }
     ]
-  }
+  },
+  { path: '*', element: <NotFound /> }
 ])
+
 
 
 

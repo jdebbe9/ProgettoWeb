@@ -1,17 +1,15 @@
-// backend/models/PasswordResetToken.js
 const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const schema = new mongoose.Schema(
-  {
-    user:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    tokenHash: { type: String, required: true, unique: true, index: true },
-    expiresAt: { type: Date,   required: true, index: true },
-    usedAt:    { type: Date }
-  },
-  { timestamps: true }
-);
+const PasswordResetTokenSchema = new Schema({
+  userId:   { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  token:    { type: String, required: true },
+  // niente "index: true" qui, il TTL lo gestiamo sotto
+  expiresAt:{ type: Date, required: true }
+});
 
-// TTL: elimina automaticamente i token dopo la scadenza
-schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// TTL: scade esattamente alla data indicata
+PasswordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model('PasswordResetToken', schema);
+module.exports = mongoose.model('PasswordResetToken', PasswordResetTokenSchema);
+

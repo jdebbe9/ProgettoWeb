@@ -31,7 +31,7 @@ const sendRefreshToken = (res, token) => {
 // Dati pubblici utente (ora include 'name')
 const publicUser = (u) => ({
   id: u._id,
-  name: u.name, // Aggiunto
+  name: u.name,
   email: u.email,
   role: u.role,
   questionnaireDone: u.questionnaireDone
@@ -41,30 +41,46 @@ const publicUser = (u) => ({
 
 // POST /api/auth/register
 exports.register = async (req, res) => {
-  // Aggiunti name, surname, birthDate
-  const { name, surname, birthDate, email, password, role, consent } = req.body;
+  // campi richiesti
+  let { name, surname, birthDate, email, password, consent } = req.body;
 
-  if (!email || !password || !name || !surname || !birthDate || consent !== true) {
+  // normalizza
+  email = String(email || '').trim().toLowerCase();
+  password = String(password || '');
+
+  if (!name || !surname || !birthDate || !email || !password || consent !== true) {
     return res.status(400).json({ message: 'Tutti i campi e il consenso sono obbligatori' });
   }
-  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: 'Email non valida' });
-  if (password.length < 6) return res.status(400).json({ message: 'Password troppo corta (min 6)' });
-
-  const finalRole = role === 'therapist' ? 'therapist' : 'patient';
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ message: 'Email non valida' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Password troppo corta (min 6)' });
+  }
+  // birthDate deve essere una data valida NON futura
+  const bd = new Date(birthDate);
+  if (Number.isNaN(bd.getTime()) || bd.getTime() > Date.now()) {
+    return res.status(400).json({ message: 'Data di nascita non valida' });
+  }
 
   try {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'Email già registrata' });
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 10);
+
+    // NB: ruolo forzato a "patient" (il terapeuta è solo da seed)
     const user = new User({
       name,
       surname,
-      birthDate,
+      birthDate: bd,
       email,
-      passwordHash,
-      role: finalRole,
-      consentGivenAt: new Date(),
+      role: 'patient',
+      passwordHash: hash,
+      // retro-compatibilità: se lo schema usa "password" per l'hash
+      password: hash,
+      privacyConsent: true,
+      consentGivenAt: new Date()
     });
 
     const accessToken = generateAccessToken(user);
@@ -83,14 +99,21 @@ exports.register = async (req, res) => {
 
 // POST /api/auth/login
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
+  email = String(email || '').trim().toLowerCase();
+  password = String(password || '');
+
   if (!email || !password) return res.status(400).json({ message: 'Email e password richieste' });
 
   try {
-    const user = await User.findOne({ email });
+    // Se nello schema password/passwordHash sono select:false, li includo esplicitamente
+    const user = await User.findOne({ email }).select('+password +passwordHash +role +approved +refreshTokenHash');
     if (!user) return res.status(401).json({ message: 'Credenziali non valide' });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    const hash = user.passwordHash || user.password;
+    if (!hash) return res.status(401).json({ message: 'Credenziali non valide' });
+
+    const ok = await bcrypt.compare(password, hash);
     if (!ok) return res.status(401).json({ message: 'Credenziali non valide' });
 
     const accessToken = generateAccessToken(user);
@@ -114,7 +137,7 @@ exports.refresh = async (req, res) => {
 
   try {
     const payload = jwt.verify(token, REFRESH_SECRET);
-    const user = await User.findById(payload.userId);
+    const user = await User.findById(payload.userId).select('+refreshTokenHash');
     if (!user) return res.status(401).json({ message: 'Utente non trovato' });
 
     const valid = await user.isRefreshTokenValid(token);
@@ -140,12 +163,14 @@ exports.logout = async (req, res) => {
   if (token) {
     try {
       const { userId } = jwt.verify(token, REFRESH_SECRET);
-      const user = await User.findById(userId);
+      const user = await User.findById(userId).select('+refreshTokenHash');
       if (user) {
         user.refreshTokenHash = undefined;
         await user.save();
       }
-    } catch {/* token rotto: niente panico, proseguiamo */}
+    } catch {
+      // token non valido: ignora
+    }
   }
   res.clearCookie('refreshToken', { path: '/api/auth' });
   return res.json({ message: 'Logout effettuato' });
@@ -155,7 +180,7 @@ exports.logout = async (req, res) => {
 exports.me = async (req, res) => {
   if (!req.user) return res.status(401).json({ message: 'Non autenticato' });
   try {
-    const user = await User.findById(req.user.id).select('-passwordHash -refreshTokenHash');
+    const user = await User.findById(req.user.id).select('-password -passwordHash -refreshTokenHash');
     if (!user) return res.status(404).json({ message: 'Utente non trovato' });
     return res.json({ user: publicUser(user) });
   } catch (err) {
@@ -163,3 +188,4 @@ exports.me = async (req, res) => {
     return res.status(500).json({ message: 'Errore interno' });
   }
 };
+

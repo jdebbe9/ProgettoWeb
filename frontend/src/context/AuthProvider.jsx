@@ -14,7 +14,7 @@ export default function AuthProvider({ children }) {
       try {
         await apiRefresh()             // cookie httpOnly → prova a rinnovare
         const data = await apiMe()
-        if (!cancelled) setUser(data?.user ?? null)
+        if (!cancelled) setUser(data)
       } catch {
         if (!cancelled) setUser(null)
       } finally {
@@ -24,15 +24,15 @@ export default function AuthProvider({ children }) {
     return () => { cancelled = true }
   }, [])
 
-  // login che ritorna l'utente e chiude il loading (niente “pagina bianca”)
   async function login(email, password) {
     setLoading(true)
-    await apiLogin(email, password)
-    const data = await apiMe()
-    const u = data?.user ?? null
-    setUser(u)
-    setLoading(false)
-    return u
+    try {
+      const data = await apiLogin({ email, password })
+      setUser(data)
+      return data
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function logout() {
@@ -47,4 +47,5 @@ export default function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+
 
