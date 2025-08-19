@@ -1,3 +1,4 @@
+// frontend/src/api/diary.js
 import api from './client'
 
 export async function listDiary() {
@@ -10,12 +11,12 @@ export async function createDiary(entry) {
   return data
 }
 
+// CORRETTO: usa `api.patch` invece di `api.put`
 export async function updateDiary(id, entry) {
-  const { data } = await api.put(`/diary/${id}`, entry)
+  const { data } = await api.patch(`/diary/${id}`, entry)
   return data
 }
 
 export async function deleteDiary(id) {
-  const { data } = await api.delete(`/diary/${id}`)
-  return data
+  await api.delete(`/diary/${id}`)
 }

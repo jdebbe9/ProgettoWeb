@@ -1,14 +1,14 @@
-// src/api/therapists.js
+// frontend/src/api/therapists.js
 import api from './client'
 
-// GET /therapists?q=...
-export async function listTherapists(q) {
-  const { data } = await api.get('/therapists', { params: q ? { q } : {} })
-  return data // atteso: [{ _id, name, specialization, bio? }]
+// Carica l'elenco di tutti i pazienti per il terapeuta
+export async function getAllPatients() {
+  const { data } = await api.get('/therapists/patients');
+  return data; // Atteso: { items: [...] }
 }
 
-// GET /therapists/:id
-export async function getTherapist(id) {
-  const { data } = await api.get(`/therapists/${id}`)
-  return data // atteso: { _id, name, specialization, bio? }
+// Ottiene i dettagli completi di un singolo paziente
+export async function getPatientDetails(id) {
+  const { data } = await api.get(`/therapists/patients/${id}`);
+  return data;
 }

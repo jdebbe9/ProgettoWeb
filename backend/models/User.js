@@ -1,8 +1,15 @@
+// backend/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
   {
+    // Campi anagrafici aggiunti
+    name:             { type: String, required: true, trim: true },
+    surname:          { type: String, required: true, trim: true },
+    birthDate:        { type: Date, required: true },
+
+    // Campi esistenti
     email:            { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash:     { type: String, required: true },
     role:             { type: String, enum: ['patient', 'therapist'], default: 'patient' },

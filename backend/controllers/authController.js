@@ -1,10 +1,9 @@
-// controllers/authController.js
+// backend/controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 // === ENV richieste ===
-// ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET
 const ACCESS_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET;
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
@@ -22,15 +21,17 @@ const generateRefreshToken = (user) =>
 const sendRefreshToken = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // in dev può restare false
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    path: '/api/auth', // cookie inviato verso /api/auth/refresh e /api/auth/logout
+    path: '/api/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 };
 
+// Dati pubblici utente (ora include 'name')
 const publicUser = (u) => ({
   id: u._id,
+  name: u.name, // Aggiunto
   email: u.email,
   role: u.role,
   questionnaireDone: u.questionnaireDone
@@ -40,16 +41,16 @@ const publicUser = (u) => ({
 
 // POST /api/auth/register
 exports.register = async (req, res) => {
-  const { email, password, role, consent } = req.body;
+  // Aggiunti name, surname, birthDate
+  const { name, surname, birthDate, email, password, role, consent } = req.body;
 
-  if (!email || !password || consent !== true) {
-    return res.status(400).json({ message: 'Email, password e consenso sono obbligatori' });
+  if (!email || !password || !name || !surname || !birthDate || consent !== true) {
+    return res.status(400).json({ message: 'Tutti i campi e il consenso sono obbligatori' });
   }
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: 'Email non valida' });
-  if (password.length < 8) return res.status(400).json({ message: 'Password troppo corta (min 8)' });
+  if (password.length < 6) return res.status(400).json({ message: 'Password troppo corta (min 6)' });
 
-  const allowedRoles = ['patient', 'therapist'];
-  const finalRole = allowedRoles.includes(role) ? role : 'patient';
+  const finalRole = role === 'therapist' ? 'therapist' : 'patient';
 
   try {
     const exists = await User.findOne({ email });
@@ -57,18 +58,19 @@ exports.register = async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = new User({
+      name,
+      surname,
+      birthDate,
       email,
       passwordHash,
       role: finalRole,
       consentGivenAt: new Date(),
-      questionnaireDone: false
     });
 
-    // genera token PRIMA del save (user._id già esiste)
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    await user.setRefreshToken(refreshToken); // salva hash lato DB (metodo del modello)
+    await user.setRefreshToken(refreshToken);
     await user.save();
 
     sendRefreshToken(res, refreshToken);
@@ -140,7 +142,7 @@ exports.logout = async (req, res) => {
       const { userId } = jwt.verify(token, REFRESH_SECRET);
       const user = await User.findById(userId);
       if (user) {
-        user.currentRefreshToken = null; // o campo equivalente nel tuo schema
+        user.refreshTokenHash = undefined;
         await user.save();
       }
     } catch {/* token rotto: niente panico, proseguiamo */}
@@ -153,7 +155,7 @@ exports.logout = async (req, res) => {
 exports.me = async (req, res) => {
   if (!req.user) return res.status(401).json({ message: 'Non autenticato' });
   try {
-    const user = await User.findById(req.user.id).select('-passwordHash -currentRefreshToken');
+    const user = await User.findById(req.user.id).select('-passwordHash -refreshTokenHash');
     if (!user) return res.status(404).json({ message: 'Utente non trovato' });
     return res.json({ user: publicUser(user) });
   } catch (err) {
