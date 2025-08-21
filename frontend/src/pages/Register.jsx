@@ -5,11 +5,15 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Alert, Box, Button, Paper, TextField, Typography,
-  FormControlLabel, Checkbox, FormHelperText
+  FormControlLabel, Checkbox, FormHelperText, Link as MuiLink,
+  InputAdornment, IconButton
 } from '@mui/material'
-import { useNavigate, Link } from 'react-router-dom'
+import Visibility from '@mui/icons-material/Visibility'
+import VisibilityOff from '@mui/icons-material/VisibilityOff'
+import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { register as apiRegister } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import PrivacyDialog from '../components/PrivacyDialog'
 
 // util: calcola età da yyyy-mm-dd
 function ageFromISO(dobStr) {
@@ -57,6 +61,8 @@ export default function Register() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [error, setError] = useState('')
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => { if (user) navigate('/dashboard', { replace: true }) }, [user, navigate])
 
@@ -80,7 +86,7 @@ export default function Register() {
     try {
       await apiRegister({
         ...values,
-        isMinor // lo mandiamo esplicitamente; il server può ricalcolare da birthDate
+        isMinor // il server può anche ricalcolarlo da birthDate
       })
       navigate('/login')
     } catch (e) {
@@ -110,15 +116,55 @@ export default function Register() {
             helperText={errors.birthDate?.message}
           />
 
-          <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
-          <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} />
+          <TextField
+            label="Email"
+            type="email"
+            {...register('email')}
+            error={!!errors.email}
+            helperText={errors.email?.message}
+          />
+
+          {/* PASSWORD con toggle visibilità */}
+          <TextField
+            label="Password"
+            type={showPassword ? 'text' : 'password'}
+            {...register('password')}
+            error={!!errors.password}
+            helperText={errors.password?.message}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
+                    onClick={() => setShowPassword(p => !p)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
 
           <div>
             <FormControlLabel
               control={<Controller name="consent" control={control} render={({ field }) => (
                 <Checkbox checked={!!field.value} onChange={(e)=>field.onChange(e.target.checked)} />
               )} />}
-              label={<span>Acconsento al trattamento dei dati personali secondo l’<Link to="/privacy">Informativa Privacy</Link>.</span>}
+              label={
+                <span>
+                  Acconsento al trattamento dei dati personali secondo l’{' '}
+                  <MuiLink
+                    component="button"
+                    type="button"
+                    onClick={() => setPrivacyOpen(true)}
+                    sx={{ p: 0, m: 0, verticalAlign: 'baseline' }}
+                  >
+                    Informativa Privacy
+                  </MuiLink>.
+                </span>
+              }
             />
             {errors.consent && <FormHelperText error>{errors.consent.message}</FormHelperText>}
           </div>
@@ -150,12 +196,17 @@ export default function Register() {
         </form>
 
         <Typography sx={{ mt: 2 }} variant="body2">
-          Hai già un account? <Link to="/login">Accedi</Link>
+          Hai già un account? <RouterLink to="/login">Accedi</RouterLink>
         </Typography>
       </Paper>
+
+      {/* Dialog Informativa Privacy */}
+      <PrivacyDialog open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </Box>
   )
 }
+
+
 
 
 

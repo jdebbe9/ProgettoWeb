@@ -3,7 +3,12 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
+import {
+  Alert, Box, Button, MenuItem, Paper, TextField, Typography,
+  InputAdornment, IconButton, FormControl, OutlinedInput, InputLabel, FormHelperText
+} from '@mui/material'
+import Visibility from '@mui/icons-material/Visibility'
+import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -20,6 +25,7 @@ export default function Login() {
   })
   const { login, user } = useAuth()
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -49,18 +55,40 @@ export default function Login() {
         <form className="stack" onSubmit={handleSubmit(onSubmit)} noValidate>
           <TextField
             label="Email"
+            type="email"
+            autoComplete="email"
             {...register('email')}
             error={!!errors.email}
             helperText={errors.email?.message}
+            fullWidth
           />
-          <TextField
-            label="Password"
-            type="password"
-            {...register('password')}
-            error={!!errors.password}
-            helperText={errors.password?.message}
-          />
-          <TextField select label="Ruolo" defaultValue="patient" {...register('role')}>
+
+          {/* PASSWORD con toggle visibilità (OutlinedInput per compatibilità adornment) */}
+          <FormControl variant="outlined" fullWidth error={!!errors.password}>
+            <InputLabel htmlFor="login-password">Password</InputLabel>
+            <OutlinedInput
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              endAdornment={
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
+                    onClick={() => setShowPassword(p => !p)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              }
+              label="Password"
+              {...register('password')}
+            />
+            {errors.password && <FormHelperText>{errors.password.message}</FormHelperText>}
+          </FormControl>
+
+          <TextField select label="Ruolo" defaultValue="patient" {...register('role')} fullWidth>
             <MenuItem value="patient">Paziente</MenuItem>
             <MenuItem value="therapist">Terapeuta</MenuItem>
           </TextField>
