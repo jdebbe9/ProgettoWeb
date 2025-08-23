@@ -9,9 +9,9 @@ import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  getUnreadCount, listNotifications, markRead, markAllRead
+  getUnreadCount, listNotifications, markAllRead, markRead
 } from '../api/notifications';
-import { connectSocket, disconnectSocket } from '../realtime/socket'; // ← rimosso getSocket
+import { connectSocket, disconnectSocket } from '../realtime/socket';
 
 function formatDate(ts) {
   if (!ts) return '';
@@ -19,7 +19,6 @@ function formatDate(ts) {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 }
-
 function routeFor(notifType, role) {
   const t = String(notifType || '').toUpperCase();
   const isTher = role === 'therapist';
@@ -27,6 +26,7 @@ function routeFor(notifType, role) {
   if (t === 'QUESTIONNAIRE_COMPLETED') return isTher ? '/therapist/dashboard' : '/dashboard';
   return isTher ? '/therapist/dashboard' : '/dashboard';
 }
+const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
 
 export default function NotificationsBell() {
   const { user } = useAuth();
@@ -39,7 +39,7 @@ export default function NotificationsBell() {
   const [loading, setLoading] = useState(false);
   const pollRef = useRef(null);
 
-  // Realtime: collega socket quando c'è un utente
+  // socket + poll
   useEffect(() => {
     if (!user) {
       setUnread(0);
@@ -47,8 +47,6 @@ export default function NotificationsBell() {
       disconnectSocket();
       return;
     }
-
-    // Sync iniziale conteggio
     (async () => {
       try {
         const c = await getUnreadCount();
@@ -59,14 +57,12 @@ export default function NotificationsBell() {
     })();
 
     const s = connectSocket();
-
     const onNew = (notif) => {
       setUnread((u) => u + 1);
       setItems((prev) => [notif, ...prev].slice(0, 20));
     };
     s.on('notification:new', onNew);
 
-    // Poll difensivo del contatore (5s in dev, 25s in prod)
     const pollMs = import.meta.env.DEV ? 5000 : 25000;
     const tick = async () => {
       try {
@@ -88,8 +84,9 @@ export default function NotificationsBell() {
     setAnchorEl(e.currentTarget);
     setLoading(true);
     try {
-      const { items: list } = await listNotifications({ limit: 20 });
-      setItems(list || []);
+      const resp = await listNotifications({ limit: 20 });
+      const list = Array.isArray(resp) ? resp : resp?.items;
+      setItems(Array.isArray(list) ? list : []);
       const c = await getUnreadCount();
       setUnread(c ?? 0);
     } catch (err) {
@@ -101,14 +98,14 @@ export default function NotificationsBell() {
   function closeMenu() { setAnchorEl(null); }
 
   async function onItemClick(n) {
-    if (!n.readAt) {
-      try {
-        await markRead(n._id);
-        setItems(prev => prev.map(x => (x._id === n._id ? { ...x, readAt: new Date().toISOString() } : x)));
-        setUnread(u => Math.max(0, u - 1));
-      } catch (err) {
-        if (import.meta.env.DEV) console.warn('[notifications] markRead failed', err);
+    if (!isRead(n)) {
+      try { await markRead(n._id); } catch (err) {
+        if (import.meta.env.DEV) console.warn('[notifications] markRead failed (ignored)', err);
       }
+      setItems(prev => prev.map(x =>
+        x._id === n._id ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true } : x
+      ));
+      setUnread(u => Math.max(0, u - 1));
     }
     const target = routeFor(n.type, user?.role);
     closeMenu();
@@ -118,8 +115,18 @@ export default function NotificationsBell() {
   async function onMarkAll() {
     try {
       await markAllRead();
-      setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString() })));
-      setUnread(0);
+      // Aggiornamento ottimistico
+      setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true })));
+      // Refetch per allineare a quanto fatto dal server
+      const [c, resp] = await Promise.all([
+        getUnreadCount().catch(() => 0),
+        listNotifications({ limit: 20 }).catch(() => null),
+      ]);
+      setUnread(Number(c) || 0);
+      if (resp) {
+        const list = Array.isArray(resp) ? resp : resp?.items;
+        if (Array.isArray(list)) setItems(list);
+      }
     } catch (err) {
       if (import.meta.env.DEV) console.warn('[notifications] markAllRead failed', err);
     }
@@ -157,7 +164,7 @@ export default function NotificationsBell() {
         ) : (
           <List dense disablePadding>
             {items.map(n => {
-              const unreadDot = !n.readAt;
+              const unreadDot = !isRead(n);
               return (
                 <ListItemButton
                   key={n._id}
@@ -198,6 +205,7 @@ export default function NotificationsBell() {
     </>
   );
 }
+
 
 
 

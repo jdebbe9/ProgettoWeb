@@ -8,6 +8,9 @@ exports.list = async (req, res) => {
   const userId = req.user.id;
   const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
   const cursor = req.query.cursor;
+  const { emitToUser } = require('../realtime/socket');
+
+
 
   const q = { userId };
   if (cursor && mongoose.isValidObjectId(cursor)) {
