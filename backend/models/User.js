@@ -4,24 +4,33 @@ const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
   {
-    // Campi anagrafici aggiunti
+    // Anagrafica
     name:             { type: String, required: true, trim: true },
     surname:          { type: String, required: true, trim: true },
-    birthDate:        { type: Date, required: true },
+    birthDate:        { type: Date,   required: true },
 
-    // Campi esistenti
+    // Account
     email:            { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash:     { type: String, required: true },
     role:             { type: String, enum: ['patient', 'therapist'], default: 'patient' },
+
+    // Stato app
     questionnaireDone:{ type: Boolean, default: false },
-    consentGivenAt:   { type: Date, required: true },
+
+    // Consenso privacy (supporto a più schemi, così /auth/me può normalizzare)
+    consent:          { type: Boolean, default: false },          // schema semplice
+    consents: {
+      privacy:        { type: Boolean, default: false }           // schema annidato
+    },
+    privacyConsent:   { type: Boolean, default: false },           // eventuale alias
+
+    consentGivenAt:   { type: Date,    required: true },
 
     // 🔒 Hash del refresh token (rotabile). Niente token in chiaro nel DB.
-    refreshTokenHash: { type: String, default: null }
+    refreshTokenHash: { type: String,  default: null }
   },
   { timestamps: true }
 );
-
 
 // Salva SOLO l'hash del refresh token (non fa .save(); ci pensano i controller)
 userSchema.methods.setRefreshToken = async function (plainToken) {
@@ -35,4 +44,5 @@ userSchema.methods.isRefreshTokenValid = async function (plainToken) {
 };
 
 module.exports = mongoose.model('User', userSchema);
+
 

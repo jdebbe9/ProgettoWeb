@@ -4,11 +4,11 @@ import {
   AppBar, Box, Button, Toolbar, Typography,
   Avatar, Menu, MenuItem, ListItemIcon, Tooltip, Divider
 } from '@mui/material'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import PersonIcon from '@mui/icons-material/Person'
 import LogoutIcon from '@mui/icons-material/Logout'
 import { useAuth } from '../context/AuthContext'
-import ProfileDialog from './ProfileDialog'
+import NotificationsBell from './NotificationsBell'
 
 function initialsFrom(user) {
   const n = [user?.name, user?.surname].filter(Boolean).join(' ').trim()
@@ -21,6 +21,7 @@ function initialsFrom(user) {
 
 export default function Navbar() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const isTherapist = user?.role === 'therapist'
   const homePath = user ? (isTherapist ? '/therapist/dashboard' : '/dashboard') : '/'
 
@@ -29,9 +30,6 @@ export default function Navbar() {
   const menuOpen = Boolean(anchorEl)
   const openMenu = (e) => setAnchorEl(e.currentTarget)
   const closeMenu = () => setAnchorEl(null)
-
-  // Dialog profilo
-  const [profileOpen, setProfileOpen] = useState(false)
 
   return (
     <AppBar position="static">
@@ -62,7 +60,10 @@ export default function Navbar() {
 
         {user && (
           <>
-            {/* Solo avatar cliccabile / hoverable */}
+            {/* Campanella notifiche */}
+            <NotificationsBell />
+
+            {/* Avatar + menù utente */}
             <Box
               onMouseEnter={openMenu}
               onClick={openMenu}
@@ -83,9 +84,7 @@ export default function Navbar() {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <MenuItem
-                onClick={() => { closeMenu(); setProfileOpen(true) }}
-              >
+              <MenuItem onClick={() => { closeMenu(); navigate('/profile') }}>
                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                 Area personale
               </MenuItem>
@@ -97,18 +96,15 @@ export default function Navbar() {
                 Logout
               </MenuItem>
             </Menu>
-
-            <ProfileDialog
-              open={profileOpen}
-              onClose={() => setProfileOpen(false)}
-              user={user}
-            />
           </>
         )}
       </Toolbar>
     </AppBar>
   )
 }
+
+
+
 
 
 

@@ -1,18 +1,51 @@
-const mongoose = require('mongoose');
+// backend/models/Appointment.js
+const { Schema, Types, model } = require('mongoose');
 
-const AppointmentSchema = new mongoose.Schema(
+const appointmentSchema = new Schema(
   {
-    patient:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    therapist: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    patient:   { type: Types.ObjectId, ref: 'User', required: true, index: true },
+    therapist: { type: Types.ObjectId, ref: 'User', required: true, index: true },
     date:      { type: Date, required: true, index: true },
-    status:    { type: String, enum: ['pending', 'accepted', 'cancelled'], default: 'pending' },
-    notes:     { type: String },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+
+    status: {
+      type: String,
+      enum: [
+        'pending',
+        'accepted',
+        'rejected',
+        'cancelled',
+        // sinonimi legacy accettati per compatibilità (verranno normalizzati)
+        'confirmed',
+        'declined',
+        'canceled',
+      ],
+      default: 'pending',
+      index: true,
+    },
+
+    createdBy: { type: Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
 
-AppointmentSchema.index({ therapist: 1, date: 1 });
-module.exports = mongoose.model('Appointment', AppointmentSchema);
+// Normalizza eventuali sinonimi legacy
+appointmentSchema.pre('save', function normalizeStatus(next) {
+  if (this.isModified('status') && typeof this.status === 'string') {
+    const s = this.status.toLowerCase();
+    const map = {
+      confirmed: 'accepted',
+      declined: 'rejected',
+      decline:  'rejected',
+      canceled: 'cancelled',
+    };
+    this.status = map[s] || s;
+  }
+  next();
+});
+
+module.exports = model('Appointment', appointmentSchema);
+
+
+
 
 

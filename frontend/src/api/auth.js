@@ -1,6 +1,7 @@
 // src/api/auth.js
 import api, { setAccessToken } from './client'
 
+
 // LOGIN
 export async function login({ email, password }) {
   const { data } = await api.post('/auth/login', { email, password })
@@ -21,6 +22,11 @@ export async function logout() {
 export async function me() {
   const { data } = await api.get('/auth/me')
   return data?.user || data
+}
+
+export async function updateMe(payload) {
+  const { data } = await api.patch('/auth/me', payload);
+  return data;
 }
 
 // REFRESH

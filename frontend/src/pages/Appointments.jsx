@@ -8,6 +8,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createAppointment, listAppointments, cancelAppointment } from '../api/appointments';
+import { connectSocket } from '../realtime/socket'; // ⬅️ realtime
 
 const THERAPIST_ID = import.meta.env.VITE_THERAPIST_ID;
 const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta';
@@ -66,8 +67,25 @@ export default function Appointments() {
 
   useEffect(() => {
     if (user) load();
-     
   }, [user]);
+
+  // ⬇️ Realtime: quando arriva un evento sugli appuntamenti, ricarica la lista
+  useEffect(() => {
+    if (!user) return;
+    const s = connectSocket();
+    const reload = () => load();
+
+    s.on('appointment:created', reload);
+    s.on('appointment:updated', reload);
+    s.on('appointment:deleted', reload);
+
+    return () => {
+      s.off('appointment:created', reload);
+      s.off('appointment:updated', reload);
+      s.off('appointment:deleted', reload);
+    };
+     
+  }, [user]); // ricollega i listener al cambio utente
 
   async function onCreate(e) {
     e.preventDefault();
@@ -193,6 +211,8 @@ export default function Appointments() {
     </Box>
   );
 }
+
+
 
 
 

@@ -14,6 +14,7 @@ import Privacy from '../pages/Privacy'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
 import Home from '../pages/Home'
+import Profile from '../pages/Profile' // <— NUOVO
 
 export const router = createBrowserRouter([
   {
@@ -35,7 +36,8 @@ export const router = createBrowserRouter([
           { path: 'dashboard',     element: <Dashboard /> },
           { path: 'diary',         element: <Diary /> },
           { path: 'appointments',  element: <Appointments /> },
-          { path: 'questionnaire', element: <Questionnaire /> },
+          { path: 'questionnaire', element: <Questionnaire /> }, // resta raggiungibile, ma reindirizza se già completato
+          { path: 'profile',       element: <Profile /> },        // <— NUOVO
         ]
       },
 
@@ -52,6 +54,7 @@ export const router = createBrowserRouter([
   },
   { path: '*', element: <NotFound /> }
 ])
+
 
 
 

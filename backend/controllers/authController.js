@@ -48,7 +48,13 @@ exports.register = async (req, res) => {
   email = String(email || '').trim().toLowerCase();
   password = String(password || '');
 
-  if (!name || !surname || !birthDate || !email || !password || consent !== true) {
+  // accetta anche formati diversi per "consent"
+  const consentBool =
+    consent === true ||
+    (typeof consent === 'string' && ['true', '1', 'on', 'yes', 'acconsento'].includes(consent.trim().toLowerCase())) ||
+    (consent && typeof consent === 'object' && consent.privacy === true);
+
+  if (!name || !surname || !birthDate || !email || !password || consentBool !== true) {
     return res.status(400).json({ message: 'Tutti i campi e il consenso sono obbligatori' });
   }
   if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -79,6 +85,9 @@ exports.register = async (req, res) => {
       passwordHash: hash,
       // retro-compatibilità: se lo schema usa "password" per l'hash
       password: hash,
+      // ⬇️ consenso salvato in tutti gli schemi possibili
+      consent: true,
+      consents: { privacy: true },
       privacyConsent: true,
       consentGivenAt: new Date()
     });
@@ -176,16 +185,108 @@ exports.logout = async (req, res) => {
   return res.json({ message: 'Logout effettuato' });
 };
 
-// GET /api/auth/me
 exports.me = async (req, res) => {
-  if (!req.user) return res.status(401).json({ message: 'Non autenticato' });
-  try {
-    const user = await User.findById(req.user.id).select('-password -passwordHash -refreshTokenHash');
-    if (!user) return res.status(404).json({ message: 'Utente non trovato' });
-    return res.json({ user: publicUser(user) });
-  } catch (err) {
-    console.error('Me error:', err);
-    return res.status(500).json({ message: 'Errore interno' });
+  const u = await User.findById(req.user.id)
+    .select(
+      'email role name surname birthDate ' +
+      'consent consents privacyConsent ' +
+      'isMinor parentFirstName parentLastName parentEmail parentPhone ' +
+      'questionnaireDone'
+    );
+
+  if (!u) return res.status(404).json({ message: 'Utente non trovato' });
+
+  // Normalizzazione robusta del consenso privacy
+  const consentRaw =
+    u.consent ??
+    u.privacyConsent ??
+    (u.consents && u.consents.privacy);
+
+  const consentBool = (() => {
+    if (typeof consentRaw === 'boolean') return consentRaw;
+    if (typeof consentRaw === 'string') {
+      const v = consentRaw.trim().toLowerCase();
+      return v === 'true' || v === '1' || v === 'on' || v === 'yes' || v === 'acconsento';
+    }
+    return false;
+  })();
+
+  res.json({
+    _id: u._id,
+    email: u.email,
+    role: u.role,
+    name: u.name ?? null,
+    surname: u.surname ?? null,
+    birthDate: u.birthDate ?? null,
+    consent: consentBool,
+    // i campi parent non sono mostrati in UI, ma restano disponibili
+    isMinor: u.isMinor ?? null,
+    parentFirstName: u.parentFirstName ?? null,
+    parentLastName: u.parentLastName ?? null,
+    parentEmail: u.parentEmail ?? null,
+    parentPhone: u.parentPhone ?? null,
+    questionnaireDone: u.questionnaireDone === true,
+  });
+};
+
+// PATCH /api/auth/me
+exports.updateMe = async (req, res) => {
+  // Consenti modifica di: name, surname, birthDate, email
+  const allow = ['name', 'surname', 'birthDate', 'email'];
+  const patch = {};
+  for (const k of allow) if (k in req.body) patch[k] = req.body[k];
+
+  // Validazioni minime
+  if (patch.name && String(patch.name).trim().length < 2) {
+    return res.status(400).json({ message: 'Nome troppo corto.' });
   }
+  if (patch.surname && String(patch.surname).trim().length < 2) {
+    return res.status(400).json({ message: 'Cognome troppo corto.' });
+  }
+  if (patch.birthDate) {
+    const d = new Date(patch.birthDate);
+    if (Number.isNaN(d.getTime())) return res.status(400).json({ message: 'Data di nascita non valida.' });
+    const today = new Date();
+    if (d > today) return res.status(400).json({ message: 'La data di nascita non può essere futura.' });
+  }
+
+  // Email (opzionale): normalizza + univocità case-insensitive
+  if (patch.email !== undefined) {
+    const emailNorm = String(patch.email).trim().toLowerCase();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(emailNorm)) {
+      return res.status(400).json({ message: 'Email non valida.' });
+    }
+    const duplicate = await User.findOne({ email: emailNorm, _id: { $ne: req.user.id } }).lean();
+    if (duplicate) {
+      return res.status(409).json({ message: 'Email già in uso.' });
+    }
+    patch.email = emailNorm;
+  }
+
+  const u = await User.findByIdAndUpdate(req.user.id, patch, { new: true })
+    .select('email role name surname birthDate consent consents privacyConsent questionnaireDone');
+
+  if (!u) return res.status(404).json({ message: 'Utente non trovato' });
+
+  // Normalizzazione consenso per la risposta
+  const consentRaw =
+    u.consent ?? u.privacyConsent ?? (u.consents && u.consents.privacy);
+  const consentBool = typeof consentRaw === 'boolean'
+    ? consentRaw
+    : (typeof consentRaw === 'string'
+        ? ['true', '1', 'on', 'yes', 'acconsento'].includes(consentRaw.trim().toLowerCase())
+        : false);
+
+  res.json({
+    _id: u._id,
+    email: u.email,
+    role: u.role,
+    name: u.name ?? null,
+    surname: u.surname ?? null,
+    birthDate: u.birthDate ?? null,
+    consent: consentBool,
+    questionnaireDone: u.questionnaireDone === true,
+  });
 };
 

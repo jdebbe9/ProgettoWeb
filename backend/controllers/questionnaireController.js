@@ -1,6 +1,8 @@
 // controllers/questionnaireController.js
 const QuestionnaireResponse = require('../models/QuestionnaireResponse');
 const User = require('../models/User');
+const { notifyTherapist, getDisplayName } = require('../services/notify');
+
 
 // Helpers -------------------------------------------------
 function sanitizeResponses(raw) {
@@ -53,6 +55,22 @@ exports.submitQuestionnaire = async (req, res) => {
     // Aggiorna flag utente (utile per la UI)
     await User.findByIdAndUpdate(req.user.id, { questionnaireDone: true });
 
+    // 🔔 Notifica il terapeuta: questionario completato
+    try {
+      const patientName = await getDisplayName(req.user.id);
+      await notifyTherapist({
+        type: 'QUESTIONNAIRE_COMPLETED',
+        title: 'Questionario completato',
+        body: `${patientName} ha completato il questionario iniziale.`,
+        data: { patientId: req.user.id, questionnaireId: response._id }
+      });
+    } catch (notifyErr) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[questionnaire:submit] notifyTherapist failed:', notifyErr?.message);
+      }
+      // Non bloccare la risposta al client per errori di notifica
+    }
+
     return res.status(201).json({
       id: response._id,
       message: 'Questionario salvato',
@@ -77,3 +95,5 @@ exports.getMyQuestionnaire = async (req, res) => {
     return res.status(500).json({ message: 'Errore interno' });
   }
 };
+
+

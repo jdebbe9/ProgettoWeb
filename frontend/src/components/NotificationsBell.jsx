@@ -1,0 +1,204 @@
+// src/components/NotificationsBell.jsx
+import { useEffect, useRef, useState } from 'react';
+import {
+  Badge, Box, CircularProgress, Divider, IconButton, List, ListItemButton,
+  ListItemText, Menu, Typography, Button
+} from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import {
+  getUnreadCount, listNotifications, markRead, markAllRead
+} from '../api/notifications';
+import { connectSocket, disconnectSocket } from '../realtime/socket'; // ← rimosso getSocket
+
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+}
+
+function routeFor(notifType, role) {
+  const t = String(notifType || '').toUpperCase();
+  const isTher = role === 'therapist';
+  if (t.startsWith('APPT_')) return isTher ? '/therapist/dashboard' : '/appointments';
+  if (t === 'QUESTIONNAIRE_COMPLETED') return isTher ? '/therapist/dashboard' : '/dashboard';
+  return isTher ? '/therapist/dashboard' : '/dashboard';
+}
+
+export default function NotificationsBell() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+  const [unread, setUnread] = useState(0);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const pollRef = useRef(null);
+
+  // Realtime: collega socket quando c'è un utente
+  useEffect(() => {
+    if (!user) {
+      setUnread(0);
+      setItems([]);
+      disconnectSocket();
+      return;
+    }
+
+    // Sync iniziale conteggio
+    (async () => {
+      try {
+        const c = await getUnreadCount();
+        setUnread(c ?? 0);
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('[notifications] initial getUnreadCount failed', err);
+      }
+    })();
+
+    const s = connectSocket();
+
+    const onNew = (notif) => {
+      setUnread((u) => u + 1);
+      setItems((prev) => [notif, ...prev].slice(0, 20));
+    };
+    s.on('notification:new', onNew);
+
+    // Poll difensivo del contatore (5s in dev, 25s in prod)
+    const pollMs = import.meta.env.DEV ? 5000 : 25000;
+    const tick = async () => {
+      try {
+        const c = await getUnreadCount();
+        setUnread(c ?? 0);
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('[notifications] poll getUnreadCount failed', err);
+      }
+    };
+    pollRef.current = setInterval(tick, pollMs);
+
+    return () => {
+      s.off('notification:new', onNew);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [user]);
+
+  async function openMenu(e) {
+    setAnchorEl(e.currentTarget);
+    setLoading(true);
+    try {
+      const { items: list } = await listNotifications({ limit: 20 });
+      setItems(list || []);
+      const c = await getUnreadCount();
+      setUnread(c ?? 0);
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('[notifications] list failed', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+  function closeMenu() { setAnchorEl(null); }
+
+  async function onItemClick(n) {
+    if (!n.readAt) {
+      try {
+        await markRead(n._id);
+        setItems(prev => prev.map(x => (x._id === n._id ? { ...x, readAt: new Date().toISOString() } : x)));
+        setUnread(u => Math.max(0, u - 1));
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('[notifications] markRead failed', err);
+      }
+    }
+    const target = routeFor(n.type, user?.role);
+    closeMenu();
+    navigate(target);
+  }
+
+  async function onMarkAll() {
+    try {
+      await markAllRead();
+      setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString() })));
+      setUnread(0);
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('[notifications] markAllRead failed', err);
+    }
+  }
+
+  return (
+    <>
+      <IconButton color="inherit" onClick={openMenu} size="large" aria-label="Notifiche" sx={{ mr: 1 }}>
+        <Badge color="error" badgeContent={unread} max={99}>
+          <NotificationsIcon />
+        </Badge>
+      </IconButton>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={closeMenu}
+        PaperProps={{ sx: { width: 360, maxWidth: 'calc(100vw - 32px)' } }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Box sx={{ px: 2, pt: 1, pb: 1 }}>
+          <Typography variant="subtitle1">Notifiche</Typography>
+        </Box>
+        <Divider />
+
+        {loading ? (
+          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={18} /> <Typography variant="body2">Caricamento…</Typography>
+          </Box>
+        ) : items.length === 0 ? (
+          <Box sx={{ p: 2 }}>
+            <Typography variant="body2" sx={{ opacity: 0.8 }}>Nessuna notifica.</Typography>
+          </Box>
+        ) : (
+          <List dense disablePadding>
+            {items.map(n => {
+              const unreadDot = !n.readAt;
+              return (
+                <ListItemButton
+                  key={n._id}
+                  onClick={() => onItemClick(n)}
+                  sx={{ alignItems: 'flex-start', py: 1.2 }}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {unreadDot && <FiberManualRecordIcon fontSize="inherit" sx={{ fontSize: 10 }} />}
+                        <Typography variant="body2" sx={{ fontWeight: unreadDot ? 600 : 400 }}>
+                          {n.title}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.25 }}>
+                        {n.body || formatDate(n.createdAt)}
+                      </Typography>
+                    }
+                  />
+                  <Typography variant="caption" sx={{ opacity: 0.7, ml: 1, whiteSpace: 'nowrap' }}>
+                    {formatDate(n.createdAt)}
+                  </Typography>
+                </ListItemButton>
+              );
+            })}
+          </List>
+        )}
+
+        <Divider />
+        <Box sx={{ p: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <Button size="small" onClick={onMarkAll} disabled={unread === 0}>
+            Segna tutte come lette
+          </Button>
+        </Box>
+      </Menu>
+    </>
+  );
+}
+
+
+
+

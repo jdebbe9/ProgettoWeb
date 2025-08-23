@@ -1,51 +1,59 @@
 // src/context/AuthProvider.jsx
-import { useEffect, useMemo, useState } from 'react'
-import { AuthContext } from './AuthContext'
-import { login as apiLogin, logout as apiLogout, me as apiMe, refresh as apiRefresh } from '../api/auth'
+import { useEffect, useMemo, useState } from 'react';
+import { AuthContext } from './AuthContext';
+import api from '../api/axios';
+import { disconnectSocket } from '../realtime/socket';
 
 export default function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // bootstrap all'avvio: prova refresh + me
+  // Refresh iniziale + /me
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+    let alive = true;
+    (async () => {
       try {
-        await apiRefresh()             // cookie httpOnly → prova a rinnovare
-        const data = await apiMe()
-        if (!cancelled) setUser(data)
+        const r = await api.post('/auth/refresh');
+        const token = r?.data?.accessToken;
+        if (token) localStorage.setItem('accessToken', token);
+        const me = await api.get('/auth/me');
+        if (alive) setUser(me.data);
       } catch {
-        if (!cancelled) setUser(null)
+        if (alive) {
+          localStorage.removeItem('accessToken');
+          setUser(null);
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (alive) setLoading(false);
       }
-    })()
-    return () => { cancelled = true }
-  }, [])
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  async function login(email, password) {
-    setLoading(true)
-    try {
-      const data = await apiLogin({ email, password })
-      setUser(data)
-      return data
-    } finally {
-      setLoading(false)
+  const login = async (email, password) => {
+    const r = await api.post('/auth/login', { email, password });
+    const token = r?.data?.accessToken;
+    if (token) localStorage.setItem('accessToken', token);
+    const me = r?.data?.user || (await api.get('/auth/me')).data;
+    setUser(me);
+    return me;
+  };
+
+  const logout = async () => {
+    try { await api.post('/auth/logout'); }
+    catch (err) { if (import.meta.env.DEV) console.warn('[auth] logout failed', err); }
+    finally {
+      localStorage.removeItem('accessToken');
+      setUser(null);
+      disconnectSocket();
     }
-  }
+  };
 
-  async function logout() {
-    setLoading(true)
-    try { await apiLogout() } finally {
-      setUser(null)
-      setLoading(false)
-    }
-  }
+  const value = useMemo(() => ({ user, setUser, login, logout, loading }), [user, loading]);
 
-  const value = useMemo(() => ({ user, loading, login, logout, setUser }), [user, loading])
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+
 
 

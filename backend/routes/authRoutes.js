@@ -32,7 +32,7 @@ try {
     message: { message: 'Troppe richieste di reset, riprova più tardi' }
   });
 } catch {
-  // Se non hai installato express-rate-limit, semplicemente non usiamo i limiter.
+  // Se non hai installato express-rate-limit, non usiamo i limiter.
   // Per abilitarli: npm i express-rate-limit
 }
 
@@ -48,8 +48,9 @@ if (limiter) {
 router.post('/refresh', authController.refresh);
 router.post('/logout',  authController.logout);
 
-// Rotta protetta: richiede Authorization: Bearer <accessToken>
-router.get('/me', requireAuth, authController.me);
+// Rotte protette
+router.get('/me',    requireAuth, authController.me);
+router.patch('/me',  requireAuth, authController.updateMe); // <-- FIX: usa authController
 
 // ── PASSWORD RESET ───────────────────────────────────────────────────────────
 if (forgotLimiter) {
@@ -60,6 +61,7 @@ if (forgotLimiter) {
 router.post('/reset-password',  passwordController.resetPassword);
 
 module.exports = router;
+
 
 
 
