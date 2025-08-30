@@ -1,5 +1,5 @@
 // frontend/src/pages/therapist/TherapistDashboard.jsx
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
   IconButton, Paper, Stack, TextField, Typography, CircularProgress
@@ -10,7 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../../context/AuthContext';
 import { listAppointments, updateAppointment } from '../../api/appointments';
 import { getAllPatients, getPatientDetails } from '../../api/therapists';
-import { connectSocket } from '../../realtime/socket'; // ⬅️ REaltime: import
+import { connectSocket } from '../../realtime/socket';
 
 function formatDT(d) {
   if (!d) return '—';
@@ -36,7 +36,10 @@ export default function TherapistDashboard() {
   const [modalContent, setModalContent] = useState(null);
   const [rescheduleData, setRescheduleData] = useState({ open: false, id: null, date: '' });
 
-  const loadData = async () => {
+  // debounce per ricarichi ravvicinati
+  const reloadTmrRef = useRef(null);
+
+  const loadData = useCallback(async () => {
     if (user?.role !== 'therapist') return;
     setLoading(true);
     setError('');
@@ -52,26 +55,46 @@ export default function TherapistDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
 
-  useEffect(() => { loadData(); }, [user]);
+  const reloadDebounced = useCallback(() => {
+    if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
+    reloadTmrRef.current = setTimeout(() => {
+      loadData();
+    }, 200);
+  }, [loadData]);
 
-  // ⬇️ Realtime: ricarica la lista quando arrivano eventi sugli appuntamenti
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Realtime: join stanza utente + ricarico liste a eventi
   useEffect(() => {
-    const s = connectSocket(); // singleton; se già connesso riusa la connessione
-    const reload = () => loadData();
+    const s = connectSocket(); // singleton; riusa la connessione se già aperta
 
-    s.on('appointment:created', reload);
-    s.on('appointment:updated', reload);
-    s.on('appointment:deleted', reload);
+    // entra nella room del terapeuta per ricevere eventi mirati
+    const uid = user?.id || user?._id;
+    if (uid) s.emit('join', String(uid));
+
+    const onConnect = () => loadData();
+
+    s.on('connect', onConnect);
+    s.on('reconnect', onConnect);
+
+    s.on('appointment:created', reloadDebounced);
+    s.on('appointment:updated', reloadDebounced);
+    s.on('appointment:removed', reloadDebounced);
+    // compat vecchio nome evento
+    s.on('appointment:deleted', reloadDebounced);
 
     return () => {
-      s.off('appointment:created', reload);
-      s.off('appointment:updated', reload);
-      s.off('appointment:deleted', reload);
+      s.off('connect', onConnect);
+      s.off('reconnect', onConnect);
+      s.off('appointment:created', reloadDebounced);
+      s.off('appointment:updated', reloadDebounced);
+      s.off('appointment:removed', reloadDebounced);
+      s.off('appointment:deleted', reloadDebounced);
+      if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // niente dipendenze: vogliamo un solo subscriber
+  }, [user, loadData, reloadDebounced]);
 
   useEffect(() => {
     if (!selectedPatientId) {
@@ -368,5 +391,7 @@ export default function TherapistDashboard() {
     </Box>
   );
 }
+
+
 
 

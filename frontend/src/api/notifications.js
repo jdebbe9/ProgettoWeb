@@ -1,33 +1,39 @@
-// src/api/notifications.js
 import api from './axios';
 
-/** Lista notifiche: supporta sia array puro che { items, nextCursor } */
+// Lista notifiche (paginata)
 export async function listNotifications({ limit = 20, cursor = null } = {}) {
-  const r = await api.get('/notifications', { params: { limit, cursor } });
-  return r.data;
+  const params = {};
+  if (limit) params.limit = limit;
+  if (cursor) params.cursor = cursor;
+  const { data } = await api.get('/notifications', { params });
+  // backend può restituire { items, nextCursor } oppure direttamente array
+  return data?.items ? data : (Array.isArray(data) ? data : []);
 }
 
-/** Conteggio non lette: accetta numero o {count}/{unread} */
+// Conteggio non lette
 export async function getUnreadCount() {
-  const r = await api.get('/notifications/unread-count');
-  const d = r.data;
-  if (typeof d === 'number') return d;
-  return d?.count ?? d?.unread ?? 0;
+  const { data } = await api.get('/notifications/unread-count');
+  return data?.count ?? 0;
 }
 
-/** Segna TUTTE come lette → PATCH /notifications/read-all */
-export async function markAllRead() {
-  await api.patch('/notifications/read-all');
-}
-
-/** Segna SINGOLA come letta → PATCH /notifications/:id/read */
+// Segna una notifica come letta
 export async function markRead(id) {
-  if (!id) return;
-  await api.patch(`/notifications/${id}/read`);
+  const { data } = await api.patch(`/notifications/${id}/read`);
+  return data;
 }
 
-/* Alias legacy: in alcuni componenti veniva usato clearAll(id) per marcare-la-letta */
-export const clearAll = markRead;
+// Segna tutte come lette
+export async function markAllRead() {
+  const { data } = await api.patch('/notifications/read-all');
+  return data;
+}
+
+// Svuota tutte (DELETE /notifications)
+export async function deleteAll() {
+  const { data } = await api.delete('/notifications');
+  return data;
+}
+
 
 
 

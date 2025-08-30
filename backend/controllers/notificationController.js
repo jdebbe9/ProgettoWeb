@@ -52,6 +52,10 @@ exports.markAllRead = async (req, res) => {
   );
   res.json({ ok: true });
 };
+exports.deleteAll = async (req, res) => {
+  await Notification.deleteMany({ userId: req.user.id });
+  res.json({ ok: true });
+};
 
 // Helper riusabile (Step 2): crea e restituisce la notifica
 // Usage: await createFor({ userId, type, title, body, data })

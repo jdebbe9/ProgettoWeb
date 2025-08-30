@@ -23,6 +23,7 @@ const diaryRoutes = require('./routes/diaryRoutes');
 const questionnaireRoutes = require('./routes/questionnaireRoutes');
 const therapistRoutes = require('./routes/therapistRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const slotRoutes = require('./routes/slotRoutes');
 
 const app = express();
 const server = http.createServer(app); // ⬅️ necessario per socket.io
@@ -62,6 +63,7 @@ app.use('/api/diary', diaryRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/therapists', therapistRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/slots', slotRoutes);
 
 // 404 ed errori centralizzati
 app.use(notFound);

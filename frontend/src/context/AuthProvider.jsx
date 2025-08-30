@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './AuthContext';
 import api, { getAccessToken, setAccessToken } from '../api/axios';
-import { disconnectSocket } from '../realtime/socket';
+import { connectSocket, disconnectSocket } from '../realtime/socket';
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -56,6 +56,15 @@ export default function AuthProvider({ children }) {
     };
   }, []);
 
+  // ⬇️ Appena abbiamo l'utente (dopo login o refresh), connetti il socket e fai join della sua stanza.
+  useEffect(() => {
+    if (!loading && user) {
+      const uid = user.id || user._id;
+      const s = connectSocket(uid);     // supporta sia versione con che senza argomento
+      if (uid) s.emit('join', String(uid)); // safety join dopo (re)connect
+    }
+  }, [user, loading]);
+
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     if (data?.accessToken) setAccessToken(data.accessToken);
@@ -83,6 +92,7 @@ export default function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
 
 
 

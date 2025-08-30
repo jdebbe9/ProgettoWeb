@@ -9,12 +9,9 @@ import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  getUnreadCount, listNotifications, markAllRead, markRead
+  getUnreadCount, listNotifications, markAllRead, markRead, deleteAll
 } from '../api/notifications';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
-
-const hasToken = () => !!localStorage.getItem('accessToken');
-const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
 
 function formatDate(ts) {
   if (!ts) return '';
@@ -29,6 +26,7 @@ function routeFor(notifType, role) {
   if (t === 'QUESTIONNAIRE_COMPLETED') return isTher ? '/therapist/dashboard' : '/dashboard';
   return isTher ? '/therapist/dashboard' : '/dashboard';
 }
+const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
 
 export default function NotificationsBell() {
   const { user } = useAuth();
@@ -36,86 +34,80 @@ export default function NotificationsBell() {
 
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const menuOpenRef = useRef(false);
+
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pollPaused, setPollPaused] = useState(false);
+  const [loading, setLoading] = useState(false);       // caricamento lista nel menu
+  const [actionBusy, setActionBusy] = useState(false); // azioni bulk
   const pollRef = useRef(null);
 
-  // socket + poll (partono solo se c'è user E token)
+  const uid = user?.id || user?._id;
+
+  // Fetch iniziale del badge quando cambia utente
   useEffect(() => {
     if (!user) {
       setUnread(0);
       setItems([]);
       disconnectSocket();
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
     }
-    if (!hasToken()) {
-      // niente token -> non partiamo (verrà sbloccato appena l’interceptor salverà un token)
-      return;
-    }
-
-    // conteggio iniziale
     (async () => {
       try {
         const c = await getUnreadCount();
         setUnread(c ?? 0);
       } catch (err) {
-        // se 401, pausa il poll
-        setPollPaused(true);
         if (import.meta.env.DEV) console.warn('[notifications] initial getUnreadCount failed', err);
       }
     })();
+  }, [user]);
 
-    // socket
+  // Socket + join room + listener realtime + poll difensivo
+  useEffect(() => {
+    if (!user) return;
+
     const s = connectSocket();
-    const uid = user?.id || user?._id;
+
+    // join nella room dell’utente (anche su reconnessione)
     const doJoin = () => { if (uid) s.emit('join', String(uid)); };
     doJoin();
     s.on('connect', doJoin);
     s.on('reconnect', doJoin);
 
+    // quando arriva una nuova notifica:
+    // - incrementa badge
+    // - se il menu è aperto, prepend nella lista
     const onNew = (notif) => {
-      setUnread((u) => u + 1);
-      setItems((prev) => [notif, ...prev].slice(0, 20));
+      setUnread((u) => (Number.isFinite(u) ? u + 1 : 1));
+      if (menuOpenRef.current) {
+        setItems((prev) => [notif, ...prev].slice(0, 20));
+      }
     };
     s.on('notification:new', onNew);
 
-    // poll difensivo del badge
-    const pollMs = import.meta.env.DEV ? 5000 : 25000;
+    // poll del badge (fallback) ogni 25s (5s in dev)
+    const pollMs = import.meta.env.DEV ? 2000 : 8000;
     const tick = async () => {
-      // se non c'è token o abbiamo messo in pausa, non fare richieste
-      if (!hasToken() || pollPaused) return;
       try {
         const c = await getUnreadCount();
         setUnread(c ?? 0);
       } catch (err) {
-        // se 401, metti in pausa per evitare spam
-        if (err?.response?.status === 401) {
-          setPollPaused(true);
-        }
         if (import.meta.env.DEV) console.warn('[notifications] poll getUnreadCount failed', err);
       }
     };
     pollRef.current = setInterval(tick, pollMs);
 
     return () => {
-      s.off('notification:new', onNew);
       s.off('connect', doJoin);
       s.off('reconnect', doJoin);
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      s.off('notification:new', onNew);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [user, pollPaused]);
-
-  // Se torna un token (es. dopo refresh riuscito), riattiva il poll
-  useEffect(() => {
-    if (user && hasToken()) setPollPaused(false);
-  }, [user]);
+  }, [user, uid]);
 
   async function openMenu(e) {
     setAnchorEl(e.currentTarget);
-    if (!hasToken()) return; // niente chiamate senza token
+    menuOpenRef.current = true;
     setLoading(true);
     try {
       const resp = await listNotifications({ limit: 20 });
@@ -124,23 +116,26 @@ export default function NotificationsBell() {
       const c = await getUnreadCount();
       setUnread(c ?? 0);
     } catch (err) {
-      if (err?.response?.status === 401) setPollPaused(true);
       if (import.meta.env.DEV) console.warn('[notifications] list failed', err);
     } finally {
       setLoading(false);
     }
   }
-  function closeMenu() { setAnchorEl(null); }
+  function closeMenu() {
+    setAnchorEl(null);
+    menuOpenRef.current = false;
+  }
 
   async function onItemClick(n) {
-    if (!isRead(n) && hasToken()) {
-      try { await markRead(n._id); } catch (err) {
+    if (!isRead(n)) {
+      try { await markRead(n._id); }
+      catch (err) {
         if (import.meta.env.DEV) console.warn('[notifications] markRead failed (ignored)', err);
       }
       setItems(prev => prev.map(x =>
         x._id === n._id ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true } : x
       ));
-      setUnread(u => Math.max(0, u - 1));
+      setUnread(u => Math.max(0, Number(u) - 1));
     }
     const target = routeFor(n.type, user?.role);
     closeMenu();
@@ -148,12 +143,13 @@ export default function NotificationsBell() {
   }
 
   async function onMarkAll() {
-    if (!hasToken()) return;
+    setActionBusy(true);
     try {
       await markAllRead();
-      // ottimistico
+      // Ottimistico
       setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true })));
-      // refetch per allineare
+      setUnread(0);
+      // Refetch per allineare
       const [c, resp] = await Promise.all([
         getUnreadCount().catch(() => 0),
         listNotifications({ limit: 20 }).catch(() => null),
@@ -164,8 +160,48 @@ export default function NotificationsBell() {
         if (Array.isArray(list)) setItems(list);
       }
     } catch (err) {
-      if (err?.response?.status === 401) setPollPaused(true);
       if (import.meta.env.DEV) console.warn('[notifications] markAllRead failed', err);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onClearAll() {
+    setActionBusy(true);
+    const prevItems = items;
+    const prevUnread = unread;
+
+    try {
+      // UI ottimistica
+      setItems([]);
+      setUnread(0);
+
+      await deleteAll();
+
+      // Refetch difensivo
+      const [c, resp] = await Promise.all([
+        getUnreadCount().catch(() => 0),
+        listNotifications({ limit: 20 }).catch(() => null),
+      ]);
+      setUnread(Number(c) || 0);
+      const list = Array.isArray(resp) ? resp : resp?.items;
+      if (Array.isArray(list)) setItems(list);
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('[notifications] deleteAll failed — rollback via refetch', err);
+      try {
+        const [c, resp] = await Promise.all([
+          getUnreadCount().catch(() => prevUnread),
+          listNotifications({ limit: 20 }).catch(() => ({ items: prevItems })),
+        ]);
+        setUnread(Number(c) || 0);
+        const list = Array.isArray(resp) ? resp : resp?.items;
+        setItems(Array.isArray(list) ? list : prevItems);
+      } catch {
+        setUnread(prevUnread);
+        setItems(prevItems);
+      }
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -233,15 +269,27 @@ export default function NotificationsBell() {
         )}
 
         <Divider />
-        <Box sx={{ p: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={onMarkAll} disabled={unread === 0 || !hasToken()}>
+        <Box sx={{ p: 1, display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button size="small" onClick={onMarkAll} disabled={actionBusy || unread === 0}>
             Segna tutte come lette
+          </Button>
+          <Button
+            size="small"
+            onClick={onClearAll}
+            disabled={actionBusy || items.length === 0}
+            color="error"
+          >
+            Svuota tutte
           </Button>
         </Box>
       </Menu>
     </>
   );
 }
+
+
+
+
 
 
 

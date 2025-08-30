@@ -1,4 +1,3 @@
-// src/router/routes.jsx
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import App from '../App'
 import Login from '../pages/Login'
@@ -16,7 +15,7 @@ import ResetPassword from '../pages/ResetPassword'
 import Home from '../pages/Home'
 import Profile from '../pages/Profile'
 
-// 🔽 FIX import path (sei in src/router, risali di uno)
+// ⬇️ percorso CORRETTO (una cartella sopra)
 import TherapistSchedule from '../pages/therapist/TherapistSchedule'
 
 export const router = createBrowserRouter([
@@ -51,8 +50,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true,           element: <Navigate to="dashboard" replace /> },
           { path: 'dashboard',     element: <TherapistDashboard /> },
-          // 🔽 nuova pagina agenda
-          { path: 'schedule',      element: <TherapistSchedule /> },
+          { path: 'schedule',      element: <TherapistSchedule /> }, // ⬅️ nuova pagina
         ]
       }
     ]

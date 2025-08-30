@@ -14,6 +14,7 @@ router.get('/unread-count',  requireAuth, notificationController.unreadCount);
 // letture
 router.patch('/read-all',    requireAuth, notificationController.markAllRead);
 router.patch('/:id/read',    requireAuth, notificationController.markRead);
+router.delete('/',          requireAuth, notificationController.deleteAll);
 
 module.exports = router;
 
