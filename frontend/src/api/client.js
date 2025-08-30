@@ -1,46 +1,50 @@
 // src/api/client.js
-import axios from 'axios'
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
-
-let accessToken = null
-export function setAccessToken(t) { accessToken = t || null }
+import axios from 'axios';
 
 const api = axios.create({
-  baseURL,
-  withCredentials: true // per mandare il cookie httpOnly di refresh
-})
+  baseURL: '/api',
+  withCredentials: true, // per il refresh cookie httpOnly
+});
 
-// Allego Authorization se ho l'access token in memoria
-api.interceptors.request.use(cfg => {
-  if (accessToken) cfg.headers.Authorization = `Bearer ${accessToken}`
-  return cfg
-})
+// token in memoria + persistenza
+let accessToken = localStorage.getItem('accessToken') || null;
+export function setAccessToken(token) {
+  accessToken = token || null;
+  if (token) localStorage.setItem('accessToken', token);
+  else localStorage.removeItem('accessToken');
+}
 
-// 401 -> prova un refresh UNA volta e ripeti la richiesta
-let refreshing = null
+// Attacca il Bearer se presente
+api.interceptors.request.use((config) => {
+  const t = accessToken || localStorage.getItem('accessToken');
+  if (t) config.headers.Authorization = `Bearer ${t}`;
+  return config;
+});
+
+// Auto-refresh UNA volta su 401, poi riprova
+let refreshing = null;
 api.interceptors.response.use(
-  res => res,
-  async err => {
-    const status = err?.response?.status
-    const config = err?.config || {}
-    if (status === 401 && !config.__isRetryRequest) {
-      if (!refreshing) {
-        refreshing = axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true })
-      }
+  (res) => res,
+  async (err) => {
+    const status = err?.response?.status;
+    const cfg = err?.config || {};
+    if (status === 401 && !cfg.__isRetryRequest) {
       try {
-        const { data } = await refreshing
-        refreshing = null
-        if (data?.accessToken) setAccessToken(data.accessToken)
-        config.__isRetryRequest = true
-        return api(config)
+        refreshing = refreshing || axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        const { data } = await refreshing;
+        refreshing = null;
+        if (data?.accessToken) setAccessToken(data.accessToken);
+        cfg.__isRetryRequest = true;
+        return api(cfg);
       } catch {
-        refreshing = null
+        refreshing = null;
+        setAccessToken(null);
       }
     }
-    throw err
+    throw err;
   }
-)
+);
 
-export default api
+export default api;
+
 

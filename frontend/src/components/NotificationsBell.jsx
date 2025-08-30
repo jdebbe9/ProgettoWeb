@@ -13,6 +13,9 @@ import {
 } from '../api/notifications';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
 
+const hasToken = () => !!localStorage.getItem('accessToken');
+const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
+
 function formatDate(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -26,7 +29,6 @@ function routeFor(notifType, role) {
   if (t === 'QUESTIONNAIRE_COMPLETED') return isTher ? '/therapist/dashboard' : '/dashboard';
   return isTher ? '/therapist/dashboard' : '/dashboard';
 }
-const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
 
 export default function NotificationsBell() {
   const { user } = useAuth();
@@ -37,38 +39,62 @@ export default function NotificationsBell() {
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pollPaused, setPollPaused] = useState(false);
   const pollRef = useRef(null);
 
-  // socket + poll
+  // socket + poll (partono solo se c'è user E token)
   useEffect(() => {
     if (!user) {
       setUnread(0);
       setItems([]);
       disconnectSocket();
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
     }
+    if (!hasToken()) {
+      // niente token -> non partiamo (verrà sbloccato appena l’interceptor salverà un token)
+      return;
+    }
+
+    // conteggio iniziale
     (async () => {
       try {
         const c = await getUnreadCount();
         setUnread(c ?? 0);
       } catch (err) {
+        // se 401, pausa il poll
+        setPollPaused(true);
         if (import.meta.env.DEV) console.warn('[notifications] initial getUnreadCount failed', err);
       }
     })();
 
+    // socket
     const s = connectSocket();
+    const uid = user?.id || user?._id;
+    const doJoin = () => { if (uid) s.emit('join', String(uid)); };
+    doJoin();
+    s.on('connect', doJoin);
+    s.on('reconnect', doJoin);
+
     const onNew = (notif) => {
       setUnread((u) => u + 1);
       setItems((prev) => [notif, ...prev].slice(0, 20));
     };
     s.on('notification:new', onNew);
 
+    // poll difensivo del badge
     const pollMs = import.meta.env.DEV ? 5000 : 25000;
     const tick = async () => {
+      // se non c'è token o abbiamo messo in pausa, non fare richieste
+      if (!hasToken() || pollPaused) return;
       try {
         const c = await getUnreadCount();
         setUnread(c ?? 0);
       } catch (err) {
+        // se 401, metti in pausa per evitare spam
+        if (err?.response?.status === 401) {
+          setPollPaused(true);
+        }
         if (import.meta.env.DEV) console.warn('[notifications] poll getUnreadCount failed', err);
       }
     };
@@ -76,12 +102,20 @@ export default function NotificationsBell() {
 
     return () => {
       s.off('notification:new', onNew);
-      if (pollRef.current) clearInterval(pollRef.current);
+      s.off('connect', doJoin);
+      s.off('reconnect', doJoin);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
+  }, [user, pollPaused]);
+
+  // Se torna un token (es. dopo refresh riuscito), riattiva il poll
+  useEffect(() => {
+    if (user && hasToken()) setPollPaused(false);
   }, [user]);
 
   async function openMenu(e) {
     setAnchorEl(e.currentTarget);
+    if (!hasToken()) return; // niente chiamate senza token
     setLoading(true);
     try {
       const resp = await listNotifications({ limit: 20 });
@@ -90,6 +124,7 @@ export default function NotificationsBell() {
       const c = await getUnreadCount();
       setUnread(c ?? 0);
     } catch (err) {
+      if (err?.response?.status === 401) setPollPaused(true);
       if (import.meta.env.DEV) console.warn('[notifications] list failed', err);
     } finally {
       setLoading(false);
@@ -98,7 +133,7 @@ export default function NotificationsBell() {
   function closeMenu() { setAnchorEl(null); }
 
   async function onItemClick(n) {
-    if (!isRead(n)) {
+    if (!isRead(n) && hasToken()) {
       try { await markRead(n._id); } catch (err) {
         if (import.meta.env.DEV) console.warn('[notifications] markRead failed (ignored)', err);
       }
@@ -113,11 +148,12 @@ export default function NotificationsBell() {
   }
 
   async function onMarkAll() {
+    if (!hasToken()) return;
     try {
       await markAllRead();
-      // Aggiornamento ottimistico
+      // ottimistico
       setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true })));
-      // Refetch per allineare a quanto fatto dal server
+      // refetch per allineare
       const [c, resp] = await Promise.all([
         getUnreadCount().catch(() => 0),
         listNotifications({ limit: 20 }).catch(() => null),
@@ -128,6 +164,7 @@ export default function NotificationsBell() {
         if (Array.isArray(list)) setItems(list);
       }
     } catch (err) {
+      if (err?.response?.status === 401) setPollPaused(true);
       if (import.meta.env.DEV) console.warn('[notifications] markAllRead failed', err);
     }
   }
@@ -197,7 +234,7 @@ export default function NotificationsBell() {
 
         <Divider />
         <Box sx={{ p: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={onMarkAll} disabled={unread === 0}>
+          <Button size="small" onClick={onMarkAll} disabled={unread === 0 || !hasToken()}>
             Segna tutte come lette
           </Button>
         </Box>
@@ -205,6 +242,8 @@ export default function NotificationsBell() {
     </>
   );
 }
+
+
 
 
 

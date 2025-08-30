@@ -146,19 +146,40 @@ exports.refresh = async (req, res) => {
 
   try {
     const payload = jwt.verify(token, REFRESH_SECRET);
-    const user = await User.findById(payload.userId).select('+refreshTokenHash');
+
+    // ⬇️ IMPORTANTE: mi assicuro di avere 'role' disponibile
+    const user = await User.findById(payload.userId)
+      .select('+refreshTokenHash role');
+
     if (!user) return res.status(401).json({ message: 'Utente non trovato' });
 
     const valid = await user.isRefreshTokenValid(token);
     if (!valid) return res.status(401).json({ message: 'Refresh token non valido' });
 
-    // Rotazione token
-    const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
+    // Rotazione
+    const newAccessToken  = jwt.sign(
+      { userId: user._id.toString(), role: user.role },
+      ACCESS_SECRET,
+      { expiresIn: '15m' }
+    );
+    const newRefreshToken = jwt.sign(
+      { userId: user._id.toString() },
+      REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
     await user.setRefreshToken(newRefreshToken);
     await user.save();
 
-    sendRefreshToken(res, newRefreshToken);
+    // cookie httpOnly per il refresh
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/auth',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh error:', err);

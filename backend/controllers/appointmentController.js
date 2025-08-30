@@ -56,8 +56,8 @@ exports.list = async (req, res, next) => {
     const items = await Appointment
       .find(filter)
       .sort({ date: 1 })
-      .populate('patient', 'name email')
-      .populate('therapist', 'name email');
+      .populate('patient', 'name surname email')
+      .populate('therapist', 'name surname email');
 
     res.json(items);
   } catch (e) { next(e); }

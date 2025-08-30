@@ -1,5 +1,5 @@
 // frontend/src/pages/Appointments.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Alert, Box, Button, IconButton, Paper, TextField, Typography,
   Snackbar, Chip
@@ -30,6 +30,9 @@ export default function Appointments() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // debounce reload
+  const reloadTmrRef = useRef(null);
+
   // Il questionario deve essere compilato per prenotare
   const questionnaireDone = user?.questionnaireDone;
 
@@ -55,37 +58,55 @@ export default function Appointments() {
     setSnack(s => ({ ...s, open: false }));
   }
 
-  async function load() {
-    setError(''); setLoading(true);
+  const load = useCallback(async () => {
+    setError('');
+    setLoading(true);
     try {
       const data = await listAppointments();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e?.response?.data?.message || 'Errore caricamento appuntamenti.');
-    } finally { setLoading(false); }
-  }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const reloadDebounced = useCallback(() => {
+    if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
+    reloadTmrRef.current = setTimeout(() => {
+      load();
+    }, 200);
+  }, [load]);
 
   useEffect(() => {
     if (user) load();
-  }, [user]);
+  }, [user, load]);
 
-  // ⬇️ Realtime: quando arriva un evento sugli appuntamenti, ricarica la lista
+  // ⬇️ Realtime: join stanza utente + ricarico lista agli eventi
   useEffect(() => {
     if (!user) return;
     const s = connectSocket();
-    const reload = () => load();
+    const uid = user?.id || user?._id;
 
-    s.on('appointment:created', reload);
-    s.on('appointment:updated', reload);
-    s.on('appointment:deleted', reload);
+    // join (anche dopo reconnect)
+    const doJoin = () => { if (uid) s.emit('join', String(uid)); };
+    doJoin();
+    s.on('connect', () => { doJoin(); load(); });
+    s.on('reconnect', () => { doJoin(); load(); });
+
+    s.on('appointment:created', reloadDebounced);
+    s.on('appointment:updated', reloadDebounced);
+    s.on('appointment:deleted', reloadDebounced);
 
     return () => {
-      s.off('appointment:created', reload);
-      s.off('appointment:updated', reload);
-      s.off('appointment:deleted', reload);
+      s.off('connect');
+      s.off('reconnect');
+      s.off('appointment:created', reloadDebounced);
+      s.off('appointment:updated', reloadDebounced);
+      s.off('appointment:deleted', reloadDebounced);
+      if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
     };
-     
-  }, [user]); // ricollega i listener al cambio utente
+  }, [user, load, reloadDebounced]);
 
   async function onCreate(e) {
     e.preventDefault();
@@ -179,18 +200,23 @@ export default function Appointments() {
         {items.map(a => (
           <Paper key={a._id} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <Typography>Data: {a.date ? new Date(a.date).toLocaleString() : '—'}</Typography>
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                Stato:&nbsp;
+              <Typography>Data: {a.date ? new Date(a.date).toLocaleString('it-IT') : '—'}</Typography>
+
+              {/* ✅ FIX hydration: niente <div> (Chip) dentro un <p>. */}
+              <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" component="span">Stato:</Typography>
                 <Chip
                   size="small"
                   color={chipColorFor(a.status)}
                   label={prettyStatus(a.status)}
                 />
-              </Typography>
+              </Box>
             </div>
+
             {a.status === 'pending' && (
-              <IconButton aria-label="Cancella" onClick={() => onCancel(a._id)}><DeleteIcon /></IconButton>
+              <IconButton aria-label="Cancella" onClick={() => onCancel(a._id)}>
+                <DeleteIcon />
+              </IconButton>
             )}
           </Paper>
         ))}
@@ -211,6 +237,7 @@ export default function Appointments() {
     </Box>
   );
 }
+
 
 
 

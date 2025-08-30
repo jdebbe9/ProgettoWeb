@@ -14,7 +14,10 @@ import Privacy from '../pages/Privacy'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
 import Home from '../pages/Home'
-import Profile from '../pages/Profile' // <— NUOVO
+import Profile from '../pages/Profile'
+
+// 🔽 FIX import path (sei in src/router, risali di uno)
+import TherapistSchedule from '../pages/therapist/TherapistSchedule'
 
 export const router = createBrowserRouter([
   {
@@ -36,8 +39,8 @@ export const router = createBrowserRouter([
           { path: 'dashboard',     element: <Dashboard /> },
           { path: 'diary',         element: <Diary /> },
           { path: 'appointments',  element: <Appointments /> },
-          { path: 'questionnaire', element: <Questionnaire /> }, // resta raggiungibile, ma reindirizza se già completato
-          { path: 'profile',       element: <Profile /> },        // <— NUOVO
+          { path: 'questionnaire', element: <Questionnaire /> },
+          { path: 'profile',       element: <Profile /> },
         ]
       },
 
@@ -47,13 +50,16 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['therapist']} />,
         children: [
           { index: true,           element: <Navigate to="dashboard" replace /> },
-          { path: 'dashboard',     element: <TherapistDashboard /> }
+          { path: 'dashboard',     element: <TherapistDashboard /> },
+          // 🔽 nuova pagina agenda
+          { path: 'schedule',      element: <TherapistSchedule /> },
         ]
       }
     ]
   },
   { path: '*', element: <NotFound /> }
 ])
+
 
 
 
