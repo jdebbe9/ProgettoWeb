@@ -1,120 +1,156 @@
 // backend/controllers/notificationController.js
+const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
-const { userFilter, unreadClause, pushUnreadCount } = require('../services/notify');
+const User = require('../models/User');
+const { emitToUser } = require('../realtime/socket');
 
-function getUid(req) {
-  return (
-    req?.user?._id ||
-    req?.user?.id ||
-    req?.auth?.userId ||
+function log(...a) { if (process.env.NODE_ENV !== 'production') console.log(...a); }
+function warn(...a) { if (process.env.NODE_ENV !== 'production') console.warn(...a); }
+
+/** Estrae id/ruolo in modo robusto da qualunque middleware tu stia usando */
+async function getAuth(req) {
+  let id =
+    (req?.user && (req.user._id || req.user.id)) ||
     req?.userId ||
-    null
-  );
+    req?.auth?.userId ||
+    null;
+
+  let role =
+    (req?.user && req.user.role) ||
+    req?.auth?.role ||
+    null;
+
+  if (!role && id && mongoose.isValidObjectId(id)) {
+    const u = await User.findById(id).select('role');
+    role = u?.role || null;
+  }
+  return { id, role };
 }
 
-// GET /api/notifications?limit=20
-exports.list = async (req, res) => {
+/** Match sia schema con userId che schema legacy con user */
+function userMatch(userId) {
+  return { $or: [{ userId: userId }, { user: userId }] };
+}
+
+/** Condizione “unread” robusta (copre read/isRead/readAt assenti) */
+function unreadConditionFor(userId) {
+  return {
+    ...userMatch(userId),
+    $and: [
+      { $or: [{ read: { $ne: true } }, { read: { $exists: false } }] },
+      { $or: [{ isRead: { $ne: true } }, { isRead: { $exists: false } }] },
+      { $or: [{ readAt: { $exists: false } }, { readAt: null }] },
+    ],
+  };
+}
+
+/** Calcola e invia via socket il nuovo conteggio */
+async function emitUnread(userId) {
+  if (!userId) return;
   try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ message: 'Non autenticato' });
+    const count = await Notification.countDocuments(unreadConditionFor(userId));
+    emitToUser(userId, 'notifications:unread', { count });
+  } catch (e) {
+    warn('[notifications] emitUnread failed:', e && e.message);
+  }
+}
 
-    let limit = parseInt(req.query.limit, 10);
-    if (!Number.isFinite(limit) || limit <= 0) limit = 20;
-    if (limit > 100) limit = 100;
+/* ----------------------------- LIST ----------------------------- */
+// GET /api/notifications?limit=20&skip=0
+exports.list = async (req, res, next) => {
+  try {
+    const { id } = await getAuth(req);
+    if (!id) return res.status(401).json({ message: 'Non autenticato' });
 
-    const items = await Notification.find(userFilter(uid))
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
+    const skip = Math.max(0, parseInt(req.query.skip, 10) || 0);
+
+    const items = await Notification
+      .find(userMatch(id))
       .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
       .limit(limit)
       .lean();
 
-    // normalizza flags di lettura (supporta read/readAt/isRead)
-    const normalized = (items || []).map((n) => ({
-      _id: n._id,
-      type: n.type,
-      title: n.title,
-      body: n.body,
-      data: n.data || {},
-      createdAt: n.createdAt,
-      readAt: n.readAt || null,
-      read: !!(n.readAt || n.read || n.isRead),
-      isRead: !!(n.readAt || n.read || n.isRead),
-    }));
-
-    res.json(normalized);
+    return res.json({ items });
   } catch (e) {
-    console.error('[notifications:list] error:', e);
-    res.status(500).json({ message: 'Errore interno (notifications:list)' });
+    warn('[notifications:list] error:', e);
+    return next(e);
   }
 };
 
+/* ----------------------- UNREAD COUNT --------------------------- */
 // GET /api/notifications/unread-count
-exports.unreadCount = async (req, res) => {
+exports.getUnreadCount = async (req, res, next) => {
   try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ message: 'Non autenticato' });
+    const { id } = await getAuth(req);
+    if (!id) return res.status(401).json({ message: 'Non autenticato' });
 
-    const count = await Notification.countDocuments({
-      ...userFilter(uid),
-      ...unreadClause,
-    });
-    res.json({ count });
+    const count = await Notification.countDocuments(unreadConditionFor(id));
+    return res.json({ count });
   } catch (e) {
-    console.error('[notifications:unread-count] error:', e);
-    res.status(500).json({ message: 'Errore interno' });
+    return next(e);
   }
 };
 
+/* ------------------------- MARK ONE ----------------------------- */
 // PATCH /api/notifications/:id/read
-exports.markRead = async (req, res) => {
+exports.markOneRead = async (req, res, next) => {
   try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ message: 'Non autenticato' });
+    const { id: myId } = await getAuth(req);
+    if (!myId) return res.status(401).json({ message: 'Non autenticato' });
 
-    const { id } = req.params;
-    await Notification.updateOne(
-      { _id: id, ...userFilter(uid) },
-      { $set: { readAt: new Date(), read: true, isRead: true } }
-    );
+    const nid = req.params.id;
+    if (!mongoose.isValidObjectId(nid)) {
+      return res.status(400).json({ message: 'ID notifica non valido' });
+    }
 
-    await pushUnreadCount(uid);
-    res.json({ ok: true });
+    const filter = { _id: nid, ...userMatch(myId) };
+    const update = { $set: { read: true, isRead: true, readAt: new Date() } };
+
+    const r = await Notification.updateOne(filter, update);
+    if (r.matchedCount === 0) {
+      return res.status(404).json({ message: 'Notifica non trovata' });
+    }
+
+    await emitUnread(myId);
+    return res.json({ ok: true });
   } catch (e) {
-    console.error('[notifications:markRead] error:', e);
-    res.status(500).json({ message: 'Errore interno' });
+    return next(e);
   }
 };
 
-// PATCH /api/notifications/mark-all
-exports.markAll = async (req, res) => {
+/* ---------------------- MARK ALL READ --------------------------- */
+// POST /api/notifications/mark-all-read
+exports.markAllRead = async (req, res, next) => {
   try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ message: 'Non autenticato' });
+    const { id: myId } = await getAuth(req);
+    if (!myId) return res.status(401).json({ message: 'Non autenticato' });
 
     await Notification.updateMany(
-      { ...userFilter(uid), ...unreadClause },
-      { $set: { readAt: new Date(), read: true, isRead: true } }
+      unreadConditionFor(myId),
+      { $set: { read: true, isRead: true, readAt: new Date() } }
     );
 
-    await pushUnreadCount(uid);
-    res.json({ ok: true });
+    await emitUnread(myId);
+    return res.json({ ok: true });
   } catch (e) {
-    console.error('[notifications:markAll] error:', e);
-    res.status(500).json({ message: 'Errore interno' });
+    return next(e);
   }
 };
 
+/* -------------------------- CLEAR ALL --------------------------- */
 // DELETE /api/notifications
-exports.clearAll = async (req, res) => {
+exports.clearAll = async (req, res, next) => {
   try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ message: 'Non autenticato' });
+    const { id: myId } = await getAuth(req);
+    if (!myId) return res.status(401).json({ message: 'Non autenticato' });
 
-    await Notification.deleteMany(userFilter(uid));
-    await pushUnreadCount(uid);
-    res.json({ ok: true });
+    await Notification.deleteMany(userMatch(myId));
+    await emitUnread(myId);
+    return res.status(204).send();
   } catch (e) {
-    console.error('[notifications:clearAll] error:', e);
-    res.status(500).json({ message: 'Errore interno' });
+    return next(e);
   }
 };
 
