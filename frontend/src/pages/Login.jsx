@@ -1,5 +1,5 @@
 // src/pages/Login.jsx
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,26 +23,41 @@ export default function Login() {
     resolver: zodResolver(schema),
     defaultValues: { role: 'patient' }
   })
-  const { login, user } = useAuth()
+  // ⬇⬇⬇ aggiungo logout e un ref per capire se è in corso il submit
+  const { login, logout, user } = useAuth()
+  const duringSubmitRef = useRef(false)
+
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
 
+  // ⬇⬇⬇ redireziona solo se NON siamo nel mezzo di un submit
   useEffect(() => {
-    if (user) {
+    if (user && !duringSubmitRef.current) {
       navigate(user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard', { replace: true })
     }
   }, [user, navigate])
 
   const onSubmit = async ({ email, password, role }) => {
     setError('')
+    duringSubmitRef.current = true // ⬅ blocca il redirect dell'useEffect
     try {
       const u = await login(email, password) // ritorna l’utente
       if (!u) { setError('Impossibile determinare il ruolo.'); return }
-      if (u.role !== role) { setError(`Questo account è di tipo "${u.role}", non "${role}".`); return }
-      navigate(u.role === 'therapist' ? '/therapist/dashboard' : '/dashboard')
+
+      // ruolo richiesto dall'utente ≠ ruolo reale dell'account
+      if (u.role !== role) {
+        setError(`Accesso non autorizzato.`)
+        // ⬇ IMPORTANTE: azzera user per evitare redirect automatico
+        await logout()
+        return
+      }
+
+      navigate(u.role === 'therapist' ? '/therapist/dashboard' : '/dashboard', { replace: true })
     } catch {
       setError('Credenziali non valide.')
+    } finally {
+      duringSubmitRef.current = false // riabilita redirect normale
     }
   }
 
@@ -63,7 +78,6 @@ export default function Login() {
             fullWidth
           />
 
-          {/* PASSWORD con toggle visibilità (OutlinedInput per compatibilità adornment) */}
           <FormControl variant="outlined" fullWidth error={!!errors.password}>
             <InputLabel htmlFor="login-password">Password</InputLabel>
             <OutlinedInput
@@ -107,6 +121,7 @@ export default function Login() {
     </Box>
   )
 }
+
 
 
 

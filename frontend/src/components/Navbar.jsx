@@ -22,8 +22,12 @@ function initialsFrom(user) {
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
   const isTherapist = user?.role === 'therapist';
   const homePath = user ? (isTherapist ? '/therapist/dashboard' : '/dashboard') : '/';
+  const profileHref = user
+    ? (isTherapist ? '/therapist/profile' : '/profile')
+    : '/login';
 
   // Menù utente (hover + click)
   const [anchorEl, setAnchorEl] = useState(null);
@@ -56,7 +60,7 @@ export default function Navbar() {
         {user && isTherapist && (
           <>
             <Button color="inherit" component={RouterLink} to="/therapist/dashboard">Dashboard</Button>
-            {/* 👇 nuovo link agenda/slot */}
+            {/* Agenda/slot */}
             <Button color="inherit" component={RouterLink} to="/therapist/schedule">Agenda</Button>
           </>
         )}
@@ -89,7 +93,7 @@ export default function Navbar() {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <MenuItem onClick={() => { closeMenu(); navigate('/profile'); }}>
+              <MenuItem onClick={() => { closeMenu(); navigate(profileHref); }}>
                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                 Area personale
               </MenuItem>
@@ -107,6 +111,7 @@ export default function Navbar() {
     </AppBar>
   );
 }
+
 
 
 

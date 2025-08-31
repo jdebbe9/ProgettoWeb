@@ -17,6 +17,7 @@ import Profile from '../pages/Profile'
 
 // ⬇️ percorso CORRETTO (una cartella sopra)
 import TherapistSchedule from '../pages/therapist/TherapistSchedule'
+import TherapistProfile from '../pages/therapist/TherapistProfile';
 
 export const router = createBrowserRouter([
   {
@@ -50,7 +51,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true,           element: <Navigate to="dashboard" replace /> },
           { path: 'dashboard',     element: <TherapistDashboard /> },
-          { path: 'schedule',      element: <TherapistSchedule /> }, // ⬅️ nuova pagina
+          { path: 'schedule',      element: <TherapistSchedule /> },
+          { path: 'profile',   element: <TherapistProfile /> },
         ]
       }
     ]

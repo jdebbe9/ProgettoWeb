@@ -76,16 +76,18 @@ export default function AuthProvider({ children }) {
     }
   }, [user, loading]);
 
-  const login = (email, password) =>
-    api.post('/auth/login', { email, password }).then(({ data }) => {
-      if (data && data.accessToken) setAccessToken(data.accessToken);
-      const mePromise = data && data.user ? Promise.resolve({ data: data.user }) : api.get('/auth/me');
-      return mePromise.then((me) => {
-        const u = me && me.data ? me.data : null;
-        setUser(u);
-        return u;
-      });
-    });
+  const login = async (email, password) => {
+  // 1) login -> ottieni access token
+  const { data } = await api.post('/auth/login', { email, password });
+  if (data?.accessToken) setAccessToken(data.accessToken);
+
+  // 2) **sempre** ricarica il profilo completo
+  const meResp = await api.get('/auth/me');
+  const me = meResp.data || null;
+
+  setUser(me);
+  return me;
+};
 
   const logout = () =>
     api.post('/auth/logout').finally(() => {

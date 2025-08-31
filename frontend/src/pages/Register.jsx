@@ -27,6 +27,9 @@ function ageFromISO(dobStr) {
   return age
 }
 
+// trasforma '' -> undefined per evitare validazioni "fantasma"
+const emptyToUndef = (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v)
+
 // schema base
 const baseSchema = z.object({
   name: z.string().min(2, 'Min 2 caratteri'),
@@ -36,12 +39,12 @@ const baseSchema = z.object({
   password: z.string().min(6, 'Min 6 caratteri'),
   consent: z.literal(true, { errorMap: () => ({ message: 'Devi accettare il consenso privacy.' }) }),
 
-  // campi genitore (opzionali a livello base, richiesti da superRefine se minore)
-  parentFirstName: z.string().optional(),
-  parentLastName: z.string().optional(),
-  parentEmail: z.string().email('Email genitore non valida').optional(),
-  parentPhone: z.string().min(6, 'Telefono non valido').optional(),
-  parentConsent: z.boolean().optional()
+  // campi genitore (accettano '' che viene trasformato in undefined)
+  parentFirstName: z.preprocess(emptyToUndef, z.string().min(2, 'Nome genitore non valido').optional()),
+  parentLastName:  z.preprocess(emptyToUndef, z.string().min(2, 'Cognome genitore non valido').optional()),
+  parentEmail:     z.preprocess(emptyToUndef, z.string().email('Email genitore non valida').optional()),
+  parentPhone:     z.preprocess(emptyToUndef, z.string().min(6, 'Telefono genitore non valido').optional()),
+  parentConsent:   z.boolean().optional(),
 })
 
 // regola condizionale: se <18 → richiedi campi genitore + parentConsent true
@@ -69,8 +72,19 @@ export default function Register() {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
+      name: '',
+      surname: '',
+      birthDate: '',
+      email: '',
+      password: '',
       consent: false,
-      parentConsent: false
+      // i campi genitore non sono montati finché non sei minore, ma
+      // se mai comparissero preferiamo stringhe vuote che diventano undefined col preprocess
+      parentFirstName: '',
+      parentLastName: '',
+      parentEmail: '',
+      parentPhone: '',
+      parentConsent: false,
     }
   })
 
@@ -86,11 +100,11 @@ export default function Register() {
     try {
       await apiRegister({
         ...values,
-        isMinor // il server può anche ricalcolarlo da birthDate
+        isMinor: isMinor === true
       })
+      // vai al login dopo la registrazione
       navigate('/login')
     } catch (e) {
-      console.error('register error:', e)
       setError(e?.response?.data?.message || e?.message || 'Registrazione non riuscita.')
     }
   }
@@ -205,6 +219,10 @@ export default function Register() {
     </Box>
   )
 }
+
+
+
+
 
 
 
