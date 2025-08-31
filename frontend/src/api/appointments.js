@@ -1,4 +1,4 @@
-import api from './client';
+import api from './axios';
 
 export async function listAppointments() {
   const { data } = await api.get('/appointments');

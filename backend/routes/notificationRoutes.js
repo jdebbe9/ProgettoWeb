@@ -1,22 +1,19 @@
 // backend/routes/notificationRoutes.js
-const router = require('express').Router();
-const path = require('path');
+const express = require('express');
+const router = express.Router();
+
 const { requireAuth } = require('../middleware/authMiddleware');
+const ctrl = require('../controllers/notificationController');
 
-const notificationController = require(
-  path.resolve(__dirname, '..', 'controllers', 'notificationController.js')
-);
-
-// lista + conteggio non lette
-router.get('/',              requireAuth, notificationController.list);
-router.get('/unread-count',  requireAuth, notificationController.unreadCount);
-
-// letture
-router.patch('/read-all',    requireAuth, notificationController.markAllRead);
-router.patch('/:id/read',    requireAuth, notificationController.markRead);
-router.delete('/',          requireAuth, notificationController.deleteAll);
+router.get('/', requireAuth, ctrl.list);
+router.get('/unread-count', requireAuth, ctrl.unreadCount);
+router.patch('/:id/read', requireAuth, ctrl.markRead);
+router.patch('/mark-all', requireAuth, ctrl.markAll);
+router.delete('/', requireAuth, ctrl.clearAll);
 
 module.exports = router;
+
+
 
 
 

@@ -29,7 +29,7 @@ function routeFor(notifType, role) {
 const isRead = (n) => Boolean(n?.readAt || n?.read || n?.isRead);
 
 export default function NotificationsBell() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [anchorEl, setAnchorEl] = useState(null);
@@ -38,171 +38,218 @@ export default function NotificationsBell() {
 
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);       // caricamento lista nel menu
-  const [actionBusy, setActionBusy] = useState(false); // azioni bulk
+  const [loading, setLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+
   const pollRef = useRef(null);
+  const hiddenRef = useRef(typeof document !== 'undefined' ? document.visibilityState === 'hidden' : false);
 
   const uid = user?.id || user?._id;
 
-  // Fetch iniziale del badge quando cambia utente
+  // Pausa poll se tab non visibile
   useEffect(() => {
+    const onVis = () => { hiddenRef.current = document.visibilityState === 'hidden'; };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  // Reset su sessione scaduta
+  useEffect(() => {
+    const onExpired = () => {
+      setUnread(0);
+      setItems([]);
+      disconnectSocket();
+    };
+    window.addEventListener('auth:session-expired', onExpired);
+    return () => window.removeEventListener('auth:session-expired', onExpired);
+  }, []);
+
+  // Bootstrap badge
+  useEffect(() => {
+    if (authLoading) return;
+
     if (!user) {
       setUnread(0);
       setItems([]);
       disconnectSocket();
       return;
     }
-    (async () => {
-      try {
-        const c = await getUnreadCount();
-        setUnread(c ?? 0);
-      } catch (err) {
-        if (import.meta.env.DEV) console.warn('[notifications] initial getUnreadCount failed', err);
-      }
-    })();
-  }, [user]);
 
-  // Socket + join room + listener realtime + poll difensivo
+    getUnreadCount()
+      .then((c) => setUnread(Number(c) || 0))
+      .catch(() => {});
+  }, [user, authLoading]);
+
+  // Realtime: socket + bridge + poll
   useEffect(() => {
-    if (!user) return;
+    if (authLoading || !user) return;
 
-    const s = connectSocket();
-
-    // join nella room dell’utente (anche su reconnessione)
-    const doJoin = () => { if (uid) s.emit('join', String(uid)); };
+    const s = connectSocket(uid);
+    const doJoin = () => { if (uid) s.emit?.('join', String(uid)); };
+    s.on?.('connect', doJoin);
+    s.on?.('reconnect', doJoin);
     doJoin();
-    s.on('connect', doJoin);
-    s.on('reconnect', doJoin);
 
-    // quando arriva una nuova notifica:
-    // - incrementa badge
-    // - se il menu è aperto, prepend nella lista
-    const onNew = (notif) => {
+    // Refetch che non abbassa mai il badge
+    const refreshBadge = () =>
+      getUnreadCount()
+        .then((c) => {
+          const server = Number(c) || 0;
+          setUnread((u) => Math.max(Number(u) || 0, server));
+        })
+        .catch(() => {});
+
+    // 1) Nuova notifica via socket → +1 ottimistico, poi allineo
+    const onNewNotifSock = (notif) => {
       setUnread((u) => (Number.isFinite(u) ? u + 1 : 1));
-      if (menuOpenRef.current) {
+      if (menuOpenRef.current && notif) {
         setItems((prev) => [notif, ...prev].slice(0, 20));
       }
+      refreshBadge();
     };
-    s.on('notification:new', onNew);
+    s.on?.('notification:new', onNewNotifSock);
 
-    // poll del badge (fallback) ogni 25s (5s in dev)
-    const pollMs = import.meta.env.DEV ? 2000 : 8000;
-    const tick = async () => {
-      try {
-        const c = await getUnreadCount();
-        setUnread(c ?? 0);
-      } catch (err) {
-        if (import.meta.env.DEV) console.warn('[notifications] poll getUnreadCount failed', err);
-      }
+    // 1.b) CONTEGGIO via socket (evento inviato dal backend)
+    const onUnreadSock = (p) => {
+      const next = Number(p?.count);
+      if (Number.isFinite(next)) setUnread(next);
     };
+    s.on?.('notifications:unread', onUnreadSock);
+
+    // 2) Nuova notifica via bridge finestra
+    const onRTNotif = (e) => {
+      const notif = e?.detail;
+      setUnread((u) => (Number.isFinite(u) ? u + 1 : 1));
+      if (menuOpenRef.current && notif) {
+        setItems((prev) => [notif, ...prev].slice(0, 20));
+      }
+      refreshBadge();
+    };
+    window.addEventListener('rt:notification', onRTNotif);
+
+    // 2.b) CONTEGGIO via bridge finestra
+    const onUnreadWin = (e) => {
+      const next = Number(e?.detail?.count);
+      if (Number.isFinite(next)) setUnread(next);
+    };
+    window.addEventListener('rt:notifications:unread', onUnreadWin);
+
+    // 3) Eventi appuntamenti → solo refresh conteggio
+    const onApptSock = () => refreshBadge();
+    s.on?.('appointment:created', onApptSock);
+    s.on?.('appointment:updated', onApptSock);
+    s.on?.('appointment:deleted', onApptSock);
+    s.on?.('appointment:removed', onApptSock);
+    const onRTAppt = () => refreshBadge();
+    window.addEventListener('rt:appointment', onRTAppt);
+
+    // 4) Poll paracadute
+    const pollMs =
+      Number(import.meta.env.VITE_NOTIF_POLL_MS) ||
+      (import.meta.env.DEV ? 4000 : 8000);
+    const tick = () => { if (!hiddenRef.current) refreshBadge(); };
     pollRef.current = setInterval(tick, pollMs);
 
     return () => {
-      s.off('connect', doJoin);
-      s.off('reconnect', doJoin);
-      s.off('notification:new', onNew);
-      if (pollRef.current) clearInterval(pollRef.current);
+      s.off?.('connect', doJoin);
+      s.off?.('reconnect', doJoin);
+      s.off?.('notification:new', onNewNotifSock);
+      s.off?.('notifications:unread', onUnreadSock);
+      s.off?.('appointment:created', onApptSock);
+      s.off?.('appointment:updated', onApptSock);
+      s.off?.('appointment:deleted', onApptSock);
+      s.off?.('appointment:removed', onApptSock);
+      window.removeEventListener('rt:notification', onRTNotif);
+      window.removeEventListener('rt:notifications:unread', onUnreadWin);
+      window.removeEventListener('rt:appointment', onRTAppt);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [user, uid]);
+  }, [user, uid, authLoading]);
 
-  async function openMenu(e) {
+  // Menu
+  function openMenu(e) {
     setAnchorEl(e.currentTarget);
     menuOpenRef.current = true;
     setLoading(true);
-    try {
-      const resp = await listNotifications({ limit: 20 });
-      const list = Array.isArray(resp) ? resp : resp?.items;
-      setItems(Array.isArray(list) ? list : []);
-      const c = await getUnreadCount();
-      setUnread(c ?? 0);
-    } catch (err) {
-      if (import.meta.env.DEV) console.warn('[notifications] list failed', err);
-    } finally {
-      setLoading(false);
-    }
+
+    listNotifications({ limit: 20 })
+      .then((resp) => {
+        const list = Array.isArray(resp) ? resp : resp && resp.items;
+        setItems(Array.isArray(list) ? list : []);
+        return getUnreadCount();
+      })
+      .then((c) => setUnread((u) => Math.max(Number(u) || 0, Number(c) || 0)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }
   function closeMenu() {
     setAnchorEl(null);
     menuOpenRef.current = false;
   }
 
-  async function onItemClick(n) {
+  // Click su notifica
+  function onItemClick(n) {
+    const go = () => {
+      const target = routeFor(n.type, user?.role);
+      closeMenu();
+      navigate(target);
+    };
+
     if (!isRead(n)) {
-      try { await markRead(n._id); }
-      catch (err) {
-        if (import.meta.env.DEV) console.warn('[notifications] markRead failed (ignored)', err);
-      }
-      setItems(prev => prev.map(x =>
-        x._id === n._id ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true } : x
-      ));
-      setUnread(u => Math.max(0, Number(u) - 1));
+      markRead(n._id)
+        .catch(() => {})
+        .finally(() => {
+          setItems((prev) =>
+            prev.map((x) =>
+              x._id === n._id ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true } : x
+            )
+          );
+          getUnreadCount().then((c) =>
+            setUnread((u) => Math.max(0, Math.min(Number(u) || 0, Number(c) || 0)))
+          ).catch(() => {});
+          go();
+        });
+    } else {
+      go();
     }
-    const target = routeFor(n.type, user?.role);
-    closeMenu();
-    navigate(target);
   }
 
-  async function onMarkAll() {
+  // Segna tutte come lette
+  function onMarkAll() {
     setActionBusy(true);
-    try {
-      await markAllRead();
-      // Ottimistico
-      setItems(prev => prev.map(x => ({ ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true })));
-      setUnread(0);
-      // Refetch per allineare
-      const [c, resp] = await Promise.all([
-        getUnreadCount().catch(() => 0),
-        listNotifications({ limit: 20 }).catch(() => null),
-      ]);
-      setUnread(Number(c) || 0);
-      if (resp) {
-        const list = Array.isArray(resp) ? resp : resp?.items;
+    markAllRead()
+      .then(() => Promise.all([getUnreadCount().catch(() => 0), listNotifications({ limit: 20 }).catch(() => null)]))
+      .then(([c, resp]) => {
+        setUnread(Number(c) || 0);
+        const list = Array.isArray(resp) ? resp : resp && resp.items;
         if (Array.isArray(list)) setItems(list);
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) console.warn('[notifications] markAllRead failed', err);
-    } finally {
-      setActionBusy(false);
-    }
+      })
+      .catch(() => {})
+      .finally(() => setActionBusy(false));
   }
 
-  async function onClearAll() {
+  // Svuota tutte
+  function onClearAll() {
     setActionBusy(true);
     const prevItems = items;
-    const prevUnread = unread;
 
-    try {
-      // UI ottimistica
-      setItems([]);
-      setUnread(0);
+    setItems([]);
+    setUnread(0);
 
-      await deleteAll();
-
-      // Refetch difensivo
-      const [c, resp] = await Promise.all([
-        getUnreadCount().catch(() => 0),
-        listNotifications({ limit: 20 }).catch(() => null),
-      ]);
-      setUnread(Number(c) || 0);
-      const list = Array.isArray(resp) ? resp : resp?.items;
-      if (Array.isArray(list)) setItems(list);
-    } catch (err) {
-      if (import.meta.env.DEV) console.warn('[notifications] deleteAll failed — rollback via refetch', err);
-      try {
-        const [c, resp] = await Promise.all([
-          getUnreadCount().catch(() => prevUnread),
-          listNotifications({ limit: 20 }).catch(() => ({ items: prevItems })),
-        ]);
+    deleteAll()
+      .then(() => Promise.all([getUnreadCount().catch(() => 0), listNotifications({ limit: 20 }).catch(() => null)]))
+      .then(([c, resp]) => {
         setUnread(Number(c) || 0);
-        const list = Array.isArray(resp) ? resp : resp?.items;
-        setItems(Array.isArray(list) ? list : prevItems);
-      } catch {
-        setUnread(prevUnread);
-        setItems(prevItems);
-      }
-    } finally {
-      setActionBusy(false);
-    }
+        const list = Array.isArray(resp) ? resp : resp && resp.items;
+        if (Array.isArray(list)) setItems(list);
+      })
+      .catch(() => {
+        listNotifications({ limit: 20 }).then((resp) => {
+          const list = Array.isArray(resp) ? resp : resp && resp.items;
+          setItems(Array.isArray(list) ? list : prevItems);
+        }).catch(() => setItems(prevItems));
+      })
+      .finally(() => setActionBusy(false));
   }
 
   return (
@@ -236,7 +283,7 @@ export default function NotificationsBell() {
           </Box>
         ) : (
           <List dense disablePadding>
-            {items.map(n => {
+            {items.map((n) => {
               const unreadDot = !isRead(n);
               return (
                 <ListItemButton
@@ -286,6 +333,11 @@ export default function NotificationsBell() {
     </>
   );
 }
+
+
+
+
+
 
 
 

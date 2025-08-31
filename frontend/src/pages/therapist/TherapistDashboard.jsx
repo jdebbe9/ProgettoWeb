@@ -15,11 +15,12 @@ import { connectSocket } from '../../realtime/socket';
 function formatDT(d) {
   if (!d) return '—';
   try { return new Date(d).toLocaleString('it-IT'); }
-  catch { return 'Data non valida'; }
+  catch  { return 'Data non valida'; }
 }
 
 export default function TherapistDashboard() {
   const { user } = useAuth();
+  const isTherapist = user?.role === 'therapist';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,8 +40,16 @@ export default function TherapistDashboard() {
   // debounce per ricarichi ravvicinati
   const reloadTmrRef = useRef(null);
 
+  // Se non sei terapeuta, non restare in loading
+  useEffect(() => {
+    if (!isTherapist) setLoading(false);
+  }, [isTherapist]);
+
   const loadData = useCallback(async () => {
-    if (user?.role !== 'therapist') return;
+    if (!isTherapist) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -50,12 +59,12 @@ export default function TherapistDashboard() {
       ]);
       setPatients(patientsRes?.items || []);
       setAppointments(Array.isArray(appointmentsRes) ? appointmentsRes : []);
-    } catch (e) {
-      setError(e?.response?.data?.message || 'Errore nel caricamento dei dati.');
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Errore nel caricamento dei dati.');
     } finally {
       setLoading(false);
     }
-  }, [user?.role]);
+  }, [isTherapist]);
 
   const reloadDebounced = useCallback(() => {
     if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
@@ -64,28 +73,46 @@ export default function TherapistDashboard() {
     }, 200);
   }, [loadData]);
 
+  // Avvio caricamento iniziale
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Realtime: join stanza utente + ricarico liste a eventi
+  // 🔒 Watchdog: se qualcosa resta appeso, chiudi lo spinner e mostra errore
   useEffect(() => {
-    const s = connectSocket(); // singleton; riusa la connessione se già aperta
+    if (!loading) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) {
+        setError((e) => e || 'Timeout nel caricamento dati. Verifica la connessione o riprova.');
+        setLoading(false);
+      }
+    }, 12000);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [loading]);
 
-    // entra nella room del terapeuta per ricevere eventi mirati
+  // Realtime: join stanza utente + ricarico liste a eventi (solo se terapeuta)
+  useEffect(() => {
+    if (!isTherapist) return;
+
+    const s = connectSocket(); // singleton; riusa la connessione se già aperta
     const uid = user?.id || user?._id;
-    if (uid) s.emit('join', String(uid));
+
+    const doJoin = () => { if (uid) s.emit('join', String(uid)); };
+    doJoin();
+    s.on('connect', doJoin);
+    s.on('reconnect', doJoin);
 
     const onConnect = () => loadData();
-
     s.on('connect', onConnect);
     s.on('reconnect', onConnect);
 
     s.on('appointment:created', reloadDebounced);
     s.on('appointment:updated', reloadDebounced);
     s.on('appointment:removed', reloadDebounced);
-    // compat vecchio nome evento
-    s.on('appointment:deleted', reloadDebounced);
+    s.on('appointment:deleted', reloadDebounced); // compat
 
     return () => {
+      s.off('connect', doJoin);
+      s.off('reconnect', doJoin);
       s.off('connect', onConnect);
       s.off('reconnect', onConnect);
       s.off('appointment:created', reloadDebounced);
@@ -94,8 +121,9 @@ export default function TherapistDashboard() {
       s.off('appointment:deleted', reloadDebounced);
       if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
     };
-  }, [user, loadData, reloadDebounced]);
+  }, [isTherapist, user, loadData, reloadDebounced]);
 
+  // Dettagli paziente selezionato
   useEffect(() => {
     if (!selectedPatientId) {
       setPatientDetails(null);
@@ -153,20 +181,29 @@ export default function TherapistDashboard() {
   const filteredPatients = useMemo(
     () =>
       patients.filter((p) =>
-        (p.name?.toLowerCase() + ' ' + p.surname?.toLowerCase()).includes(searchTerm.toLowerCase()) ||
-        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        ((p.name || '').toLowerCase() + ' ' + (p.surname || '').toLowerCase()).includes(searchTerm.toLowerCase()) ||
+        (p.email || '').toLowerCase().includes(searchTerm.toLowerCase())
       ),
     [patients, searchTerm]
   );
 
   const pendingAppointments = useMemo(
-    () => appointments.filter((a) => a.status === 'pending'),
+    () => appointments.filter((a) => String(a.status || '').toLowerCase() === 'pending'),
     [appointments]
   );
 
   const patientName = patientDetails?.user?.name
     ? `${patientDetails.user.name} ${patientDetails.user.surname}`
     : (patientDetails?.user?.email || '...');
+
+  // Non terapeuta: messaggio esplicito (evita spinner eterno)
+  if (!isTherapist) {
+    return (
+      <Box sx={{ display: 'grid', placeItems: 'center', height: '50vh' }}>
+        <Typography variant="body1">Accesso riservato ai terapeuti.</Typography>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
@@ -391,6 +428,8 @@ export default function TherapistDashboard() {
     </Box>
   );
 }
+
+
 
 
 

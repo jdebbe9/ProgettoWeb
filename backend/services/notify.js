@@ -1,63 +1,117 @@
 // backend/services/notify.js
-const User = require('../models/User');
-const { createFor } = require('../controllers/notificationController');
+const Notification = require('../models/Notification');
+const { emitToUser } = require('../realtime/socket');
 
-/**
- * Restituisce l'ID del terapeuta unico del sistema.
- * Ordine di risoluzione:
- * 1) THERAPIST_ID (diretto da .env)
- * 2) THERAPIST_EMAIL (match su utente con role: 'therapist')
- * 3) Primo utente con role: 'therapist'
+const DEV = process.env.NODE_ENV !== 'production';
+const dlog = (...a) => DEV && console.log('[notify]', ...a);
+const dwarn = (...a) => DEV && console.warn('[notify]', ...a);
+
+// Accetta schemi che usano 'userId' o 'user'
+function userFilter(userId) {
+  const uid = String(userId);
+  return { $or: [{ userId: uid }, { user: uid }] };
+}
+
+// "Non letta" = niente readAt e flag read/isRead non true
+const unreadClause = {
+  $and: [
+    { $or: [{ readAt: { $exists: false } }, { readAt: null }] },
+    { $or: [{ read: { $exists: false } }, { read: { $ne: true } }] },
+    { $or: [{ isRead: { $exists: false } }, { isRead: { $ne: true } }] },
+  ],
+};
+
+// Conta e invia il badge
+async function pushUnreadCount(userId) {
+  if (!userId) return;
+  const count = await Notification.countDocuments({ ...userFilter(userId), ...unreadClause });
+  emitToUser(userId, 'notifications:unread', { count });
+  dlog('emit notifications:unread →', String(userId), count);
+}
+
+// Normalizza payload "new" verso il client
+function sanitizeNotif(doc) {
+  if (!doc) return null;
+  return {
+    _id: doc._id,
+    type: doc.type,
+    title: doc.title,
+    body: doc.body,
+    data: doc.data || {},
+    createdAt: doc.createdAt,
+    read: !!(doc.readAt || doc.read || doc.isRead),
+    isRead: !!(doc.readAt || doc.read || doc.isRead),
+  };
+}
+
+/** Crea una notifica + emette:
+ *  - notification:new (per la lista)
+ *  - notifications:unread {count} (per il badge)
  */
-async function getTherapistId() {
-  // 1) .env con ID esplicito
-  if (process.env.THERAPIST_ID) return process.env.THERAPIST_ID;
+async function notifyUser(userId, payload = {}) {
+  if (!userId) throw new Error('notifyUser: userId richiesto');
 
-  // 2) .env con email
-  if (process.env.THERAPIST_EMAIL) {
-    const tByEmail = await User.findOne({
-      email: process.env.THERAPIST_EMAIL,
-      role: 'therapist',
-    }).select('_id').lean();
-    if (tByEmail?._id) return tByEmail._id.toString();
+  const base = {
+    type: String(payload.type || 'INFO').toUpperCase(),
+    title: payload.title || '',
+    body: payload.body || '',
+    data: payload.data || {},
+  };
+
+  // Tenta userId + user (compat)
+  let doc = null;
+  try {
+    doc = await Notification.create({ ...base, userId: userId, user: userId });
+  } catch (e1) {
+    dwarn('create with userId+user failed:', e1?.message || e1);
+    // fallback: prova con il solo campo 'user'
+    doc = await Notification.create({ ...base, user: userId });
   }
 
-  // 3) fallback
-  const t = await User.findOne({ role: 'therapist' }).select('_id').lean();
-  return t?._id?.toString() || null;
+  try {
+    emitToUser(userId, 'notification:new', sanitizeNotif(doc));
+    dlog('emit notification:new →', String(userId));
+  } catch (e) {
+    dwarn('emit notification:new failed:', e?.message || e);
+  }
+
+  await pushUnreadCount(userId);
+  return doc;
 }
 
-/**
- * Nome visualizzato per un utente (Nome Cognome) con fallback "Paziente".
- */
-async function getDisplayName(userId) {
-  const u = await User.findById(userId).select('name surname').lean();
-  const n = [u?.name, u?.surname].filter(Boolean).join(' ').trim();
-  return n || 'Paziente';
+/** Segna UNA notifica come letta + aggiorna badge */
+async function markOneRead(userId, id) {
+  await Notification.updateOne(
+    { _id: id, ...userFilter(userId) },
+    { $set: { readAt: new Date(), read: true, isRead: true } }
+  );
+  await pushUnreadCount(userId);
 }
 
-/**
- * Notifica il terapeuta “default” (se presente).
- * Suggerito solo quando non hai già l'ID del terapeuta coinvolto.
- */
-async function notifyTherapist({ type, title, body = '', data = {} }) {
-  const therapistId = await getTherapistId();
-  if (!therapistId) return;
-  await createFor({ userId: therapistId, type, title, body, data });
+/** Segna TUTTE come lette + aggiorna badge */
+async function markAllRead(userId) {
+  await Notification.updateMany(
+    { ...userFilter(userId), ...unreadClause },
+    { $set: { readAt: new Date(), read: true, isRead: true } }
+  );
+  await pushUnreadCount(userId);
 }
 
-/**
- * Notifica un utente arbitrario (paziente/terapeuta).
- */
-async function notifyUser(userId, { type, title, body = '', data = {} }) {
-  if (!userId) return;
-  await createFor({ userId, type, title, body, data });
+/** Svuota tutto + aggiorna badge */
+async function clearAll(userId) {
+  await Notification.deleteMany(userFilter(userId));
+  await pushUnreadCount(userId);
 }
 
 module.exports = {
-  getTherapistId,
-  getDisplayName,
-  notifyTherapist,
   notifyUser,
+  pushUnreadCount,
+  markOneRead,
+  markAllRead,
+  clearAll,
+  userFilter,      // esportati se servono altrove
+  unreadClause,
 };
+
+
 

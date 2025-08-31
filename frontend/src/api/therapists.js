@@ -1,5 +1,5 @@
 // frontend/src/api/therapists.js
-import api from './client'
+import api from './axios'
 
 // Carica l'elenco di tutti i pazienti per il terapeuta
 export async function getAllPatients() {

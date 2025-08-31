@@ -1,76 +1,84 @@
 // src/api/axios.js
 import axios from 'axios';
 
-/** token in memoria + localStorage per persistenza */
-let accessToken = localStorage.getItem('accessToken') || null;
+let accessToken = null;
+if (typeof window !== 'undefined' && window.localStorage) {
+  const stored = window.localStorage.getItem('accessToken');
+  accessToken = stored ? stored : null;
+}
 
 export function setAccessToken(t) {
-  accessToken = t || null;
-  if (t) localStorage.setItem('accessToken', t);
-  else localStorage.removeItem('accessToken');
+  accessToken = t ? t : null;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    if (t) window.localStorage.setItem('accessToken', t);
+    else window.localStorage.removeItem('accessToken');
+  }
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('auth:token', { detail: { token: accessToken } }));
+  }
 }
-export function getAccessToken() {
-  return accessToken;
-}
+export function getAccessToken() { return accessToken; }
 
-/** Istanza principale per la tua app */
 const api = axios.create({
   baseURL: '/api',
-  withCredentials: true, // serve per il cookie httpOnly di refresh
+  withCredentials: true,
+  timeout: 15000,          // ⬅️ aggiunto: 15s hard cap
 });
 
-/** Istanza "bare" SOLO per /auth/refresh, senza interceptor */
 const bare = axios.create({
   baseURL: '/api',
   withCredentials: true,
+  timeout: 15000,
 });
 
-// Allego Bearer se presente
 api.interceptors.request.use((config) => {
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (accessToken) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = 'Bearer ' + accessToken;
+  }
   return config;
 });
 
-// 401 -> prova un refresh UNA volta (mai su /auth/refresh)
 let refreshingPromise = null;
+function performRefresh() {
+  if (!refreshingPromise) {
+    refreshingPromise = bare.post('/auth/refresh', null).then(
+      (resp) => {
+        refreshingPromise = null;
+        const data = resp && resp.data ? resp.data : null;
+        const tok = data && data.accessToken ? data.accessToken : null;
+        return tok;
+      },
+      () => { refreshingPromise = null; return null; }
+    );
+  }
+  return refreshingPromise;
+}
 
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
-    const status = err?.response?.status;
-    const cfg = err?.config || {};
-
-    // Se non è 401, o l'abbiamo già ritentata, o è proprio /auth/refresh -> basta
-    const url = (cfg?.url || '').toString();
-    const isRefreshCall = url.includes('/auth/refresh');
+    const resp = err && err.response ? err.response : null;
+    const status = resp ? resp.status : 0;
+    const cfg = (err && err.config) ? { ...err.config } : {};
+    const url = cfg && cfg.url ? String(cfg.url) : '';
+    const isRefreshCall = url.indexOf('/auth/refresh') !== -1;
     if (status !== 401 || cfg.__isRetryRequest || isRefreshCall) {
       return Promise.reject(err);
     }
-
-    try {
-      if (!refreshingPromise) {
-        // NIENTE Authorization qui; il cookie httpOnly basta
-        refreshingPromise = bare.post('/auth/refresh', {});
-      }
-
-      const { data } = await refreshingPromise;
-      refreshingPromise = null;
-
-      if (data?.accessToken) {
-        setAccessToken(data.accessToken);
-        // ritenta la richiesta originale una sola volta
-        cfg.__isRetryRequest = true;
-        return api(cfg);
-      }
-
-      // se non c'è accessToken nella risposta, consideriamo l'utente non autenticato
+    const newAccess = await performRefresh();
+    if (!newAccess) {
       setAccessToken(null);
-      return Promise.reject(err);
-    } catch {
-      refreshingPromise = null;
-      setAccessToken(null);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      }
       return Promise.reject(err);
     }
+    setAccessToken(newAccess);
+    cfg.__isRetryRequest = true;
+    cfg.headers = cfg.headers || {};
+    cfg.headers.Authorization = 'Bearer ' + newAccess;
+    return api(cfg);
   }
 );
 

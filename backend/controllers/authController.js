@@ -3,13 +3,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// === ENV richieste ===
 const ACCESS_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET;
 if (!ACCESS_SECRET || !REFRESH_SECRET) {
   console.error('FATAL: manca ACCESS_TOKEN_SECRET o REFRESH_TOKEN_SECRET');
   process.exit(1);
 }
+
+const COOKIE_PATH = '/api/auth/refresh';
 
 // Helpers -------------------------------------------------
 const generateAccessToken = (user) =>
@@ -18,37 +19,50 @@ const generateAccessToken = (user) =>
 const generateRefreshToken = (user) =>
   jwt.sign({ userId: user._id.toString() }, REFRESH_SECRET, { expiresIn: '7d' });
 
-const sendRefreshToken = (res, token) => {
-  res.cookie('refreshToken', token, {
+// Imposta sia il vero cookie httpOnly sia il cookie-spia leggibile dal client (non sensibile)
+const sendRefreshCookies = (res, token) => {
+  const opts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    path: '/api/auth',
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    path: COOKIE_PATH,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+  res.cookie('refreshToken', token, opts);
+  // cookie spia (NON contiene segreti) per evitare chiamate /refresh inutili
+  res.cookie('hasRefresh', '1', {
+    httpOnly: false,
+    secure: opts.secure,
+    sameSite: opts.sameSite,
+    path: COOKIE_PATH,
+    maxAge: opts.maxAge,
   });
 };
 
-// Dati pubblici utente (ora include 'name')
+const clearRefreshCookies = (res) => {
+  res.clearCookie('refreshToken', { path: COOKIE_PATH });
+  res.clearCookie('hasRefresh', { path: COOKIE_PATH });
+  // compat col vecchio path
+  res.clearCookie('refreshToken', { path: '/api/auth' });
+  res.clearCookie('hasRefresh', { path: '/api/auth' });
+};
+
+// Dati pubblici utente
 const publicUser = (u) => ({
   id: u._id,
   name: u.name,
   email: u.email,
   role: u.role,
-  questionnaireDone: u.questionnaireDone
+  questionnaireDone: u.questionnaireDone,
 });
 
 // Controllers --------------------------------------------
 
-// POST /api/auth/register
 exports.register = async (req, res) => {
-  // campi richiesti
   let { name, surname, birthDate, email, password, consent } = req.body;
-
-  // normalizza
   email = String(email || '').trim().toLowerCase();
   password = String(password || '');
 
-  // accetta anche formati diversi per "consent"
   const consentBool =
     consent === true ||
     (typeof consent === 'string' && ['true', '1', 'on', 'yes', 'acconsento'].includes(consent.trim().toLowerCase())) ||
@@ -57,13 +71,9 @@ exports.register = async (req, res) => {
   if (!name || !surname || !birthDate || !email || !password || consentBool !== true) {
     return res.status(400).json({ message: 'Tutti i campi e il consenso sono obbligatori' });
   }
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
-    return res.status(400).json({ message: 'Email non valida' });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Password troppo corta (min 6)' });
-  }
-  // birthDate deve essere una data valida NON futura
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: 'Email non valida' });
+  if (password.length < 6) return res.status(400).json({ message: 'Password troppo corta (min 6)' });
+
   const bd = new Date(birthDate);
   if (Number.isNaN(bd.getTime()) || bd.getTime() > Date.now()) {
     return res.status(400).json({ message: 'Data di nascita non valida' });
@@ -75,7 +85,6 @@ exports.register = async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
-    // NB: ruolo forzato a "patient" (il terapeuta è solo da seed)
     const user = new User({
       name,
       surname,
@@ -83,22 +92,22 @@ exports.register = async (req, res) => {
       email,
       role: 'patient',
       passwordHash: hash,
-      // retro-compatibilità: se lo schema usa "password" per l'hash
       password: hash,
-      // ⬇️ consenso salvato in tutti gli schemi possibili
       consent: true,
       consents: { privacy: true },
       privacyConsent: true,
-      consentGivenAt: new Date()
+      consentGivenAt: new Date(),
     });
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    await user.setRefreshToken(refreshToken);
+    if (typeof user.setRefreshToken === 'function') {
+      await user.setRefreshToken(refreshToken);
+    }
     await user.save();
 
-    sendRefreshToken(res, refreshToken);
+    sendRefreshCookies(res, refreshToken);
     return res.status(201).json({ accessToken, user: publicUser(user) });
   } catch (err) {
     console.error('Register error:', err);
@@ -106,7 +115,6 @@ exports.register = async (req, res) => {
   }
 };
 
-// POST /api/auth/login
 exports.login = async (req, res) => {
   let { email, password } = req.body;
   email = String(email || '').trim().toLowerCase();
@@ -115,7 +123,6 @@ exports.login = async (req, res) => {
   if (!email || !password) return res.status(400).json({ message: 'Email e password richieste' });
 
   try {
-    // Se nello schema password/passwordHash sono select:false, li includo esplicitamente
     const user = await User.findOne({ email }).select('+password +passwordHash +role +approved +refreshTokenHash');
     if (!user) return res.status(401).json({ message: 'Credenziali non valide' });
 
@@ -128,10 +135,12 @@ exports.login = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    await user.setRefreshToken(refreshToken); // rotazione
+    if (typeof user.setRefreshToken === 'function') {
+      await user.setRefreshToken(refreshToken);
+    }
     await user.save();
 
-    sendRefreshToken(res, refreshToken);
+    sendRefreshCookies(res, refreshToken);
     return res.json({ accessToken, user: publicUser(user) });
   } catch (err) {
     console.error('Login error:', err);
@@ -139,57 +148,51 @@ exports.login = async (req, res) => {
   }
 };
 
-// POST /api/auth/refresh
+// POST/GET /api/auth/refresh
 exports.refresh = async (req, res) => {
-  const token = req.cookies?.refreshToken;
-  if (!token) return res.status(401).json({ message: 'Nessun refresh token' });
+  const token = req.cookies && req.cookies.refreshToken ? req.cookies.refreshToken : null;
+  if (!token) {
+    clearRefreshCookies(res);
+    return res.status(401).json({ message: 'Nessun refresh token' });
+  }
 
   try {
     const payload = jwt.verify(token, REFRESH_SECRET);
 
-    // ⬇️ IMPORTANTE: mi assicuro di avere 'role' disponibile
-    const user = await User.findById(payload.userId)
-      .select('+refreshTokenHash role');
+    const user = await User.findById(payload.userId).select('+refreshTokenHash role');
+    if (!user) {
+      clearRefreshCookies(res);
+      return res.status(401).json({ message: 'Utente non trovato' });
+    }
 
-    if (!user) return res.status(401).json({ message: 'Utente non trovato' });
+    if (typeof user.isRefreshTokenValid === 'function') {
+      const valid = await user.isRefreshTokenValid(token);
+      if (!valid) {
+        clearRefreshCookies(res);
+        return res.status(401).json({ message: 'Refresh token non valido' });
+      }
+    }
 
-    const valid = await user.isRefreshTokenValid(token);
-    if (!valid) return res.status(401).json({ message: 'Refresh token non valido' });
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
 
-    // Rotazione
-    const newAccessToken  = jwt.sign(
-      { userId: user._id.toString(), role: user.role },
-      ACCESS_SECRET,
-      { expiresIn: '15m' }
-    );
-    const newRefreshToken = jwt.sign(
-      { userId: user._id.toString() },
-      REFRESH_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    await user.setRefreshToken(newRefreshToken);
+    if (typeof user.setRefreshToken === 'function') {
+      await user.setRefreshToken(newRefreshToken);
+    }
     await user.save();
 
-    // cookie httpOnly per il refresh
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/api/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    sendRefreshCookies(res, newRefreshToken);
     return res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh error:', err);
+    clearRefreshCookies(res);
     return res.status(401).json({ message: 'Refresh token non valido o scaduto' });
   }
 };
 
-// POST /api/auth/logout
 exports.logout = async (req, res) => {
-  const token = req.cookies?.refreshToken;
+  const token = req.cookies && req.cookies.refreshToken ? req.cookies.refreshToken : null;
+
   if (token) {
     try {
       const { userId } = jwt.verify(token, REFRESH_SECRET);
@@ -198,14 +201,13 @@ exports.logout = async (req, res) => {
         user.refreshTokenHash = undefined;
         await user.save();
       }
-    } catch {
-      // token non valido: ignora
-    }
+    } catch (e) {}
   }
-  res.clearCookie('refreshToken', { path: '/api/auth' });
+  clearRefreshCookies(res);
   return res.json({ message: 'Logout effettuato' });
 };
 
+// GET /api/auth/me
 exports.me = async (req, res) => {
   const u = await User.findById(req.user.id)
     .select(
@@ -217,20 +219,12 @@ exports.me = async (req, res) => {
 
   if (!u) return res.status(404).json({ message: 'Utente non trovato' });
 
-  // Normalizzazione robusta del consenso privacy
-  const consentRaw =
-    u.consent ??
-    u.privacyConsent ??
-    (u.consents && u.consents.privacy);
-
-  const consentBool = (() => {
-    if (typeof consentRaw === 'boolean') return consentRaw;
-    if (typeof consentRaw === 'string') {
-      const v = consentRaw.trim().toLowerCase();
-      return v === 'true' || v === '1' || v === 'on' || v === 'yes' || v === 'acconsento';
-    }
-    return false;
-  })();
+  const consentRaw = u.consent ?? u.privacyConsent ?? (u.consents && u.consents.privacy);
+  const consentBool =
+    typeof consentRaw === 'boolean' ? consentRaw :
+    (typeof consentRaw === 'string'
+      ? ['true', '1', 'on', 'yes', 'acconsento'].includes(consentRaw.trim().toLowerCase())
+      : false);
 
   res.json({
     _id: u._id,
@@ -240,7 +234,6 @@ exports.me = async (req, res) => {
     surname: u.surname ?? null,
     birthDate: u.birthDate ?? null,
     consent: consentBool,
-    // i campi parent non sono mostrati in UI, ma restano disponibili
     isMinor: u.isMinor ?? null,
     parentFirstName: u.parentFirstName ?? null,
     parentLastName: u.parentLastName ?? null,
@@ -252,12 +245,10 @@ exports.me = async (req, res) => {
 
 // PATCH /api/auth/me
 exports.updateMe = async (req, res) => {
-  // Consenti modifica di: name, surname, birthDate, email
   const allow = ['name', 'surname', 'birthDate', 'email'];
   const patch = {};
   for (const k of allow) if (k in req.body) patch[k] = req.body[k];
 
-  // Validazioni minime
   if (patch.name && String(patch.name).trim().length < 2) {
     return res.status(400).json({ message: 'Nome troppo corto.' });
   }
@@ -267,21 +258,15 @@ exports.updateMe = async (req, res) => {
   if (patch.birthDate) {
     const d = new Date(patch.birthDate);
     if (Number.isNaN(d.getTime())) return res.status(400).json({ message: 'Data di nascita non valida.' });
-    const today = new Date();
-    if (d > today) return res.status(400).json({ message: 'La data di nascita non può essere futura.' });
+    if (d > new Date()) return res.status(400).json({ message: 'La data di nascita non può essere futura.' });
   }
 
-  // Email (opzionale): normalizza + univocità case-insensitive
   if (patch.email !== undefined) {
     const emailNorm = String(patch.email).trim().toLowerCase();
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRe.test(emailNorm)) {
-      return res.status(400).json({ message: 'Email non valida.' });
-    }
+    if (!emailRe.test(emailNorm)) return res.status(400).json({ message: 'Email non valida.' });
     const duplicate = await User.findOne({ email: emailNorm, _id: { $ne: req.user.id } }).lean();
-    if (duplicate) {
-      return res.status(409).json({ message: 'Email già in uso.' });
-    }
+    if (duplicate) return res.status(409).json({ message: 'Email già in uso.' });
     patch.email = emailNorm;
   }
 
@@ -290,14 +275,12 @@ exports.updateMe = async (req, res) => {
 
   if (!u) return res.status(404).json({ message: 'Utente non trovato' });
 
-  // Normalizzazione consenso per la risposta
-  const consentRaw =
-    u.consent ?? u.privacyConsent ?? (u.consents && u.consents.privacy);
-  const consentBool = typeof consentRaw === 'boolean'
-    ? consentRaw
-    : (typeof consentRaw === 'string'
-        ? ['true', '1', 'on', 'yes', 'acconsento'].includes(consentRaw.trim().toLowerCase())
-        : false);
+  const consentRaw = u.consent ?? u.privacyConsent ?? (u.consents && u.consents.privacy);
+  const consentBool =
+    typeof consentRaw === 'boolean' ? consentRaw :
+    (typeof consentRaw === 'string'
+      ? ['true', '1', 'on', 'yes', 'acconsento'].includes(consentRaw.trim().toLowerCase())
+      : false);
 
   res.json({
     _id: u._id,
@@ -310,4 +293,6 @@ exports.updateMe = async (req, res) => {
     questionnaireDone: u.questionnaireDone === true,
   });
 };
+
+
 
