@@ -45,7 +45,7 @@ exports.getAllPatients = async (req, res) => {
 
 /**
  * GET /api/therapists/patients/:id
- * Dettagli di un paziente: profilo, diario, questionario, appuntamenti.
+ * Dettagli di un paziente: profilo, diario (SOLO condiviso), questionario, appuntamenti.
  * Solo terapeuta; valida ObjectId; dati minimizzati.
  */
 exports.getPatientDetails = async (req, res) => {
@@ -65,7 +65,11 @@ exports.getPatientDetails = async (req, res) => {
     }
 
     const [diary, questionnaire, appointments] = await Promise.all([
-      DiaryEntry.find({ user: userId }).sort({ createdAt: -1 }),
+      // ⬇️ SOLO voci condivise; include anche quelle storiche senza 'shared'
+      DiaryEntry.find({
+        user: userId,
+        $or: [{ shared: true }, { shared: { $exists: false } }]
+      }).sort({ createdAt: -1 }),
       QuestionnaireResponse.findOne({ user: userId }).select('-__v -user'),
       Appointment.find({ patient: userId })
         .sort({ date: 1 })

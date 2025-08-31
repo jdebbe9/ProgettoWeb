@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../../context/AuthContext';
 import { listAppointments, updateAppointment } from '../../api/appointments';
 import { connectSocket } from '../../realtime/socket';
+import ScheduleTabs from '../../components/ScheduleTabs';
 
 const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h per slot
 const WEEK_DAYS = 5; // Lun–Ven
@@ -178,6 +179,9 @@ export default function TherapistSchedule() {
 
   return (
     <Box className="container" sx={{ mt: 3, maxWidth: 1100 }}>
+      {/* ⬇️ Aggiunta: Tab Calendario / Richieste / Disponibilità */}
+      <ScheduleTabs />
+
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Tooltip title="Settimana precedente">
@@ -354,4 +358,5 @@ function prettyStatus(statusRaw) {
 function LegendDot({ sx }) {
   return <Box sx={{ width: 12, height: 12, borderRadius: '50%', ...sx }} />;
 }
+
 

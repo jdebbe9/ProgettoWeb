@@ -21,6 +21,11 @@ const questionnaireRoutes = require('./routes/questionnaireRoutes');
 const therapistRoutes = require('./routes/therapistRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const slotRoutes = require('./routes/slotRoutes');
+const articleRoutes = require('./routes/articleRoutes');
+const bookRoutes = require('./routes/bookRoutes');
+const assignmentRoutes = require('./routes/assignmentRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const safetyPlanRoutes = require('./routes/safetyPlanRoutes');
 
 const app = express();
 
@@ -71,6 +76,11 @@ app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/therapists', therapistRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/slots', slotRoutes);
+app.use('/api/articles', articleRoutes);
+app.use('/api/books', bookRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/safety-plan', safetyPlanRoutes);
 
 /* 404 & error handler */
 app.use(notFound);

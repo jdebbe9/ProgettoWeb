@@ -12,7 +12,8 @@ const DiaryEntrySchema = new mongoose.Schema(
       required: true,
       trim: true,
       maxlength: 5000
-    }
+    },
+    shared:  { type: Boolean, default: true, index: true },
     // niente "date": usiamo createdAt fornito da timestamps
   },
   { timestamps: true }

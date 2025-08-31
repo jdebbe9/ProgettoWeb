@@ -1,11 +1,14 @@
 // frontend/src/pages/Diary.jsx
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from '@mui/material';
+import {
+  Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  Paper, Stack, TextField, Typography, FormControlLabel, Checkbox, Chip
+} from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { listDiary, createDiary } from '../api/diary'; // Rimosse update e delete
+import { listDiary, createDiary } from '../api/diary'; // niente update/delete
 
 const schema = z.object({
   content: z.string().trim().min(1, 'Il contenuto è obbligatorio').max(5000, 'Massimo 5000 caratteri')
@@ -15,7 +18,8 @@ export default function Diary() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isCreating, setIsCreating] = useState(false); // Stato per il dialogo
+  const [isCreating, setIsCreating] = useState(false);
+  const [shared, setShared] = useState(true); // ⬅️ nuovo: privacy per la voce
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -40,7 +44,8 @@ export default function Diary() {
   const onSubmit = async (data) => {
     setError('');
     try {
-      await createDiary(data);
+      // ⬇️ includo il flag di condivisione
+      await createDiary({ content: data.content, shared });
       handleClose();
       await load();
     } catch (e) {
@@ -50,6 +55,7 @@ export default function Diary() {
 
   function handleOpen() {
     reset({ content: '' });
+    setShared(true); // default: condivisa
     setIsCreating(true);
   }
 
@@ -64,7 +70,8 @@ export default function Diary() {
         <Button variant="contained" onClick={handleOpen}>Nuova Voce</Button>
       </Box>
       <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
-        Scrivi i tuoi pensieri e le tue emozioni. Una volta salvata, la voce non potrà essere modificata o cancellata.
+        Scrivi i tuoi pensieri ed emozioni. Puoi scegliere se condividere la voce con il terapeuta.
+        Una volta salvata, la voce non potrà essere modificata o cancellata.
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -78,9 +85,13 @@ export default function Diary() {
           {items.length === 0 && <Typography>Nessuna voce nel diario.</Typography>}
           {items.map(entry => (
             <Paper key={entry._id} sx={{ p: 2, borderLeft: '4px solid', borderColor: 'primary.main' }}>
-              <Typography variant="body2" sx={{ opacity: 0.7, mb: 1 }}>
-                {new Date(entry.createdAt).toLocaleString()}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                  {new Date(entry.createdAt).toLocaleString('it-IT')}
+                </Typography>
+                {/* Chip “Privato” solo quando non condivisa (retrocompatibilità: undefined = condivisa) */}
+                {entry.shared === false && <Chip size="small" label="Privato" />}
+              </Box>
               <Typography sx={{ whiteSpace: 'pre-wrap' }}>{entry.content}</Typography>
             </Paper>
           ))}
@@ -107,6 +118,12 @@ export default function Diary() {
                   autoFocus
                 />
               )}
+            />
+            {/* Toggle privacy */}
+            <FormControlLabel
+              sx={{ mt: 1 }}
+              control={<Checkbox checked={shared} onChange={(e)=>setShared(e.target.checked)} />}
+              label="Condividi col terapeuta"
             />
           </DialogContent>
           <DialogActions>

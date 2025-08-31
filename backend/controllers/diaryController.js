@@ -1,11 +1,11 @@
-// controllers/diaryController.js
 const mongoose = require('mongoose');
 const DiaryEntry = require('../models/DiaryEntry');
 
 // POST /api/diary
 exports.createDiaryEntry = async (req, res) => {
   try {
-    const raw = (req.body?.content ?? '').toString();
+    const { content: bodyContent, shared } = req.body || {};
+    const raw = (bodyContent ?? '').toString();
     const content = raw.trim();
 
     if (!content) {
@@ -17,7 +17,8 @@ exports.createDiaryEntry = async (req, res) => {
 
     const entry = await DiaryEntry.create({
       user: req.user.id,
-      content
+      content,
+      shared: shared !== undefined ? !!shared : true
     });
 
     return res.status(201).json(entry);
@@ -65,16 +66,32 @@ exports.updateDiaryEntry = async (req, res) => {
       return res.status(400).json({ message: 'ID entry non valido' });
     }
 
-    const raw = (req.body?.content ?? '').toString();
-    const content = raw.trim();
-    if (!content) return res.status(400).json({ message: 'Il contenuto è obbligatorio' });
-    if (content.length > 5000) {
-      return res.status(400).json({ message: 'Il contenuto supera i 5000 caratteri' });
+    const patch = {};
+    // content (opzionale)
+    if (req.body?.content !== undefined) {
+      const raw = (req.body.content ?? '').toString();
+      const content = raw.trim();
+      if (!content) {
+        return res.status(400).json({ message: 'Il contenuto è obbligatorio' });
+      }
+      if (content.length > 5000) {
+        return res.status(400).json({ message: 'Il contenuto supera i 5000 caratteri' });
+      }
+      patch.content = content;
+    }
+
+    // shared (opzionale)
+    if (req.body?.shared !== undefined) {
+      patch.shared = !!req.body.shared;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ message: 'Nessun campo da aggiornare' });
     }
 
     const entry = await DiaryEntry.findOneAndUpdate(
       { _id: entryId, user: req.user.id }, // ownership check
-      { content },
+      { $set: patch },
       { new: true }
     );
 
@@ -86,7 +103,7 @@ exports.updateDiaryEntry = async (req, res) => {
   }
 };
 
-// DELETE /api/diary/:entryId  (opzionale: esponila nelle route se ti serve)
+// DELETE /api/diary/:entryId
 exports.deleteDiaryEntry = async (req, res) => {
   try {
     const { entryId } = req.params;

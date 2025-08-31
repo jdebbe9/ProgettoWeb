@@ -1,429 +1,365 @@
 // frontend/src/pages/therapist/TherapistDashboard.jsx
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  IconButton, Paper, Stack, TextField, Typography, CircularProgress
+  Alert, Box, Button, Chip, Divider, Grid, Link, Paper, Stack, Typography, CircularProgress, Dialog, DialogTitle, DialogContent
 } from '@mui/material';
-import CheckIcon from '@mui/icons-material/Check';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import EventIcon from '@mui/icons-material/Event';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import PeopleIcon from '@mui/icons-material/People';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { listAppointments, updateAppointment } from '../../api/appointments';
+import { listAppointments } from '../../api/appointments';
 import { getAllPatients, getPatientDetails } from '../../api/therapists';
 import { connectSocket } from '../../realtime/socket';
 
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  return x;
+}
+function endOfDay(d) {
+  const x = new Date(d);
+  x.setHours(23,59,59,999);
+  return x;
+}
+function inRange(date, a, b) {
+  const t = new Date(date).getTime();
+  return t >= a.getTime() && t <= b.getTime();
+}
 function formatDT(d) {
-  if (!d) return '—';
-  try { return new Date(d).toLocaleString('it-IT'); }
-  catch  { return 'Data non valida'; }
+  try { return new Date(d).toLocaleString('it-IT'); } catch { return '—'; }
+}
+function formatD(d) {
+  try { return new Date(d).toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'2-digit' }); } catch { return '—'; }
 }
 
 export default function TherapistDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isTherapist = user?.role === 'therapist';
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
 
   const [appointments, setAppointments] = useState([]);
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients]         = useState([]);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPatientId, setSelectedPatientId] = useState(null);
-
+  // Modal "scheda paziente" leggera
+  const [openPatient, setOpenPatient] = useState(null);
   const [patientDetails, setPatientDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const [modalContent, setModalContent] = useState(null);
-  const [rescheduleData, setRescheduleData] = useState({ open: false, id: null, date: '' });
-
-  // debounce per ricarichi ravvicinati
-  const reloadTmrRef = useRef(null);
-
-  // Se non sei terapeuta, non restare in loading
-  useEffect(() => {
-    if (!isTherapist) setLoading(false);
-  }, [isTherapist]);
-
   const loadData = useCallback(async () => {
-    if (!isTherapist) {
-      setLoading(false);
-      return;
-    }
+    if (!isTherapist) { setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
-      const [patientsRes, appointmentsRes] = await Promise.all([
-        getAllPatients(),
-        listAppointments()
+      const [apps, patsRes] = await Promise.all([
+        listAppointments(),
+        getAllPatients()
       ]);
-      setPatients(patientsRes?.items || []);
-      setAppointments(Array.isArray(appointmentsRes) ? appointmentsRes : []);
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Errore nel caricamento dei dati.');
+      setAppointments(Array.isArray(apps) ? apps : []);
+      setPatients(Array.isArray(patsRes?.items) ? patsRes.items : []);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Errore nel caricamento dei dati.');
     } finally {
       setLoading(false);
     }
   }, [isTherapist]);
 
-  const reloadDebounced = useCallback(() => {
-    if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
-    reloadTmrRef.current = setTimeout(() => {
-      loadData();
-    }, 200);
-  }, [loadData]);
-
-  // Avvio caricamento iniziale
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // 🔒 Watchdog: se qualcosa resta appeso, chiudi lo spinner e mostra errore
-  useEffect(() => {
-    if (!loading) return;
-    let cancelled = false;
-    const t = setTimeout(() => {
-      if (!cancelled) {
-        setError((e) => e || 'Timeout nel caricamento dati. Verifica la connessione o riprova.');
-        setLoading(false);
-      }
-    }, 12000);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [loading]);
-
-  // Realtime: join stanza utente + ricarico liste a eventi (solo se terapeuta)
+  // realtime: aggiorna KPI/listini alla creazione/aggiornamento
   useEffect(() => {
     if (!isTherapist) return;
-
-    const s = connectSocket(); // singleton; riusa la connessione se già aperta
-    const uid = user?.id || user?._id;
-
-    const doJoin = () => { if (uid) s.emit('join', String(uid)); };
-    doJoin();
-    s.on('connect', doJoin);
-    s.on('reconnect', doJoin);
-
-    const onConnect = () => loadData();
-    s.on('connect', onConnect);
-    s.on('reconnect', onConnect);
-
-    s.on('appointment:created', reloadDebounced);
-    s.on('appointment:updated', reloadDebounced);
-    s.on('appointment:removed', reloadDebounced);
-    s.on('appointment:deleted', reloadDebounced); // compat
-
+    const s = connectSocket();
+    const reload = () => loadData();
+    s.on('appointment:created', reload);
+    s.on('appointment:updated', reload);
+    s.on('appointment:removed', reload);
+    s.on('appointment:deleted', reload);
     return () => {
-      s.off('connect', doJoin);
-      s.off('reconnect', doJoin);
-      s.off('connect', onConnect);
-      s.off('reconnect', onConnect);
-      s.off('appointment:created', reloadDebounced);
-      s.off('appointment:updated', reloadDebounced);
-      s.off('appointment:removed', reloadDebounced);
-      s.off('appointment:deleted', reloadDebounced);
-      if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
+      s.off('appointment:created', reload);
+      s.off('appointment:updated', reload);
+      s.off('appointment:removed', reload);
+      s.off('appointment:deleted', reload);
     };
-  }, [isTherapist, user, loadData, reloadDebounced]);
+  }, [isTherapist, loadData]);
 
-  // Dettagli paziente selezionato
-  useEffect(() => {
-    if (!selectedPatientId) {
-      setPatientDetails(null);
-      return;
-    }
-    const loadDetails = async () => {
-      setLoadingDetails(true);
-      setError('');
-      try {
-        const data = await getPatientDetails(selectedPatientId);
-        setPatientDetails(data);
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Errore nel caricamento dei dettagli.');
-      } finally {
-        setLoadingDetails(false);
-      }
-    };
-    loadDetails();
-  }, [selectedPatientId]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  const handleUpdateAppointment = async (id, payload) => {
-    try {
-      await updateAppointment(id, payload);
-      await loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Errore durante l\'aggiornamento.');
-    }
-  };
+  // ---- KPI derivati ----
+  const now = new Date();
+  const todayA = startOfDay(now);
+  const todayB = endOfDay(now);
+  const in7dA = startOfDay(now);
+  const in7dB = endOfDay(new Date(now.getTime() + 6*24*60*60*1000)); // oggi + 6 -> 7 giorni
 
-  // Rifiuta senza popup
-  const handleRejectAppointment = async (id) => {
-    setError('');
-    try {
-      await updateAppointment(id, { status: 'rejected' });
-      await loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Errore durante il rifiuto.');
-    }
-  };
-
-  const openRescheduleDialog = (id, date) => {
-    const dt = new Date(date || Date.now());
-    const pad = (n) => String(n).padStart(2, '0');
-    const dateString = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-    setRescheduleData({ open: true, id, date: dateString });
-  };
-
-  const confirmReschedule = () => {
-    if (rescheduleData.id && rescheduleData.date) {
-      handleUpdateAppointment(rescheduleData.id, { date: rescheduleData.date });
-    }
-    setRescheduleData({ open: false, id: null, date: '' });
-  };
-
-  const filteredPatients = useMemo(
-    () =>
-      patients.filter((p) =>
-        ((p.name || '').toLowerCase() + ' ' + (p.surname || '').toLowerCase()).includes(searchTerm.toLowerCase()) ||
-        (p.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [patients, searchTerm]
-  );
-
-  const pendingAppointments = useMemo(
-    () => appointments.filter((a) => String(a.status || '').toLowerCase() === 'pending'),
+  const acceptedStatuses = new Set(['accepted', 'rescheduled']);
+  const pendingCount = useMemo(
+    () => appointments.filter(a => a.status === 'pending').length,
     [appointments]
   );
-
-  const patientName = patientDetails?.user?.name
-    ? `${patientDetails.user.name} ${patientDetails.user.surname}`
-    : (patientDetails?.user?.email || '...');
-
-  // Non terapeuta: messaggio esplicito (evita spinner eterno)
-  if (!isTherapist) {
-    return (
-      <Box sx={{ display: 'grid', placeItems: 'center', height: '50vh' }}>
-        <Typography variant="body1">Accesso riservato ai terapeuti.</Typography>
-      </Box>
+  const todayCount = useMemo(
+    () => appointments.filter(a => acceptedStatuses.has(a.status) && inRange(a.date, todayA, todayB)).length,
+    [appointments]
+  );
+  const activePatients90d = useMemo(() => {
+    const since = new Date(now.getTime() - 90*24*60*60*1000);
+    const ids = new Set(
+      appointments
+        .filter(a => acceptedStatuses.has(a.status) && new Date(a.date) >= since)
+        .map(a => a.patient?._id || a.patient)
     );
-  }
+    ids.delete(undefined);
+    return ids.size;
+  }, [appointments]);
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'grid', placeItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const recentPatients = useMemo(() => {
+    const map = new Map();
+    appointments
+      .filter(a => acceptedStatuses.has(a.status))
+      .sort((a,b) => new Date(b.date) - new Date(a.date))
+      .forEach(a => {
+        const p = a.patient;
+        const id = p?._id || p;
+        if (!map.has(id) && p) map.set(id, p);
+      });
+    return Array.from(map.values()).slice(0,5);
+  }, [appointments]);
+
+  // percentuale questionario completato fra i pazienti creati negli ultimi 30 gg
+  const q30 = useMemo(() => {
+    const since = new Date(now.getTime() - 30*24*60*60*1000);
+    const recent = patients.filter(p => new Date(p.createdAt) >= since);
+    const done = recent.filter(p => !!p.questionnaireDone);
+    const pct = recent.length ? Math.round((done.length / recent.length) * 100) : 0;
+    return { pct, done: done.length, total: recent.length };
+  }, [patients]);
+
+  const upcoming7 = useMemo(() => {
+    return appointments
+      .filter(a => acceptedStatuses.has(a.status) && inRange(a.date, in7dA, in7dB))
+      .sort((a,b) => new Date(a.date) - new Date(b.date))
+      .slice(0, 8);
+  }, [appointments]);
+
+  // Banners
+  const banners = useMemo(() => {
+    const items = [];
+    if (pendingCount > 0) {
+      items.push({
+        key: 'pending',
+        title: `Hai ${pendingCount} richieste di appuntamento in attesa`,
+        actionLabel: 'Rivedi nell’Agenda',
+        onClick: () => navigate('/therapist/schedule'),
+      });
+    }
+    if (upcoming7.length === 0) {
+      items.push({
+        key: 'availability',
+        title: 'Non hai appuntamenti nei prossimi 7 giorni',
+        actionLabel: 'Aggiungi disponibilità',
+        onClick: () => navigate('/therapist/schedule'),
+      });
+    }
+    return items;
+  }, [pendingCount, upcoming7, navigate]);
+
+  // Apertura scheda paziente (modal leggera)
+  const openPatientCard = async (p) => {
+    setOpenPatient(p);
+    setPatientDetails(null);
+    setLoadingDetails(true);
+    try {
+      const data = await getPatientDetails(p._id);
+      setPatientDetails(data);
+    } catch  {
+      // noop
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   return (
-    <Box className="container" sx={{ mt: 3, maxWidth: 980 }}>
+    <Box sx={{ p: 2 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Dashboard Terapeuta</Typography>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6">Pazienti</Typography>
-        <TextField
-          fullWidth
-          label="Cerca paziente..."
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ my: 2 }}
-        />
-        <Stack spacing={1} sx={{ maxHeight: 300, overflowY: 'auto', p: 0.5 }}>
-          {filteredPatients.length > 0 ? (
-            filteredPatients.map((p) => (
-              <Paper
-                key={p._id}
-                variant="outlined"
-                onClick={() => setSelectedPatientId(p._id)}
-                sx={{
-                  p: 1.5,
-                  cursor: 'pointer',
-                  borderColor: selectedPatientId === p._id ? 'primary.main' : 'divider',
-                }}
-              >
-                <Typography fontWeight="bold">
-                  {p.name} {p.surname}
-                </Typography>
-                <Typography variant="body2">{p.email}</Typography>
-              </Paper>
-            ))
-          ) : (
-            <Typography>Nessun paziente trovato.</Typography>
-          )}
-        </Stack>
-      </Paper>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-          gap: 3,
-          mb: 3,
-        }}
-      >
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Diario Paziente
-          </Typography>
-          <Button
-            variant="outlined"
-            disabled={!selectedPatientId || loadingDetails}
-            onClick={() => setModalContent('diary')}
-          >
-            {loadingDetails ? <CircularProgress size={24} /> : `Vedi diario`}
-          </Button>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Questionario
-          </Typography>
-          <Button
-            variant="outlined"
-            disabled={!selectedPatientId || loadingDetails}
-            onClick={() => setModalContent('questionnaire')}
-          >
-            {loadingDetails ? <CircularProgress size={24} /> : `Vedi questionario`}
-          </Button>
-        </Paper>
-      </Box>
-
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Appuntamenti in attesa
-        </Typography>
-        <Stack spacing={1.5}>
-          {pendingAppointments.length > 0 ? (
-            pendingAppointments.map((a) => (
-              <Paper
-                key={a._id}
-                sx={{
-                  p: 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <Box sx={{ flex: 1, minWidth: 200 }}>
-                  <Typography sx={{ fontWeight: 600 }}>
-                    {a.patient?.name}
-                  </Typography>
-                  <Typography variant="body2">Data: {formatDT(a.date)}</Typography>
-                </Box>
-                <Stack direction="row" spacing={0.5}>
-                  <IconButton
-                    onClick={() => handleUpdateAppointment(a._id, { status: 'accepted' })}
-                    color="success"
-                    title="Accetta"
-                  >
-                    <CheckIcon />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => openRescheduleDialog(a._id, a.date)}
-                    title="Modifica"
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  {/* Rifiuta senza conferma */}
-                  <IconButton
-                    onClick={() => handleRejectAppointment(a._id)}
-                    color="error"
-                    title="Rifiuta"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+      {loading ? (
+        <CircularProgress />
+      ) : (
+        <>
+          {/* KPI */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <EventIcon />
+                  <Typography variant="subtitle2">Appuntamenti oggi</Typography>
                 </Stack>
+                <Typography variant="h4" sx={{ mt: 1 }}>{todayCount}</Typography>
+                <Link component={RouterLink} to="/therapist/schedule" underline="hover">
+                  Vai all’Agenda
+                </Link>
               </Paper>
-            ))
-          ) : (
-            <Typography>Nessun appuntamento in attesa.</Typography>
-          )}
-        </Stack>
-      </Paper>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <HourglassEmptyIcon />
+                  <Typography variant="subtitle2">Richieste in attesa</Typography>
+                </Stack>
+                <Typography variant="h4" sx={{ mt: 1 }}>{pendingCount}</Typography>
+                <Link component={RouterLink} to="/therapist/schedule" underline="hover">
+                  Rivedi richieste
+                </Link>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <PeopleIcon />
+                  <Typography variant="subtitle2">Pazienti attivi (90 gg)</Typography>
+                </Stack>
+                <Typography variant="h4" sx={{ mt: 1 }}>{activePatients90d}</Typography>
+                <Typography variant="body2" color="text.secondary">Visite confermate</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <AssignmentTurnedInIcon />
+                  <Typography variant="subtitle2">Questionari (ultimi 30 gg)</Typography>
+                </Stack>
+                <Typography variant="h4" sx={{ mt: 1 }}>{q30.pct}%</Typography>
+                <Typography variant="body2" color="text.secondary">{q30.done}/{q30.total} completati</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
 
-      <Dialog
-        open={!!modalContent}
-        onClose={() => setModalContent(null)}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>
-          {modalContent === 'diary' ? 'Diario – ' : 'Questionario – '} {patientName}
-        </DialogTitle>
-        <DialogContent dividers>
-          {loadingDetails ? (
-            <CircularProgress />
-          ) : (
-            <>
-              {modalContent === 'diary' && (
-                patientDetails?.diary?.length > 0 ? (
-                  <Stack spacing={2}>
-                    {patientDetails.diary.map((e) => (
-                      <Paper key={e._id} variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="caption">{formatDT(e.createdAt)}</Typography>
-                        <Typography sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
-                          {e.content}
-                        </Typography>
+          {/* Centro azioni */}
+          <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+              <Button variant="contained" endIcon={<ArrowForwardIcon />} onClick={() => navigate('/therapist/schedule')}>
+                Rivedi richieste in attesa
+              </Button>
+              <Button variant="outlined" onClick={() => navigate('/therapist/schedule')}>
+                Aggiungi disponibilità
+              </Button>
+            </Stack>
+          </Paper>
+
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Prossimi 7 giorni */}
+            <Grid item xs={12} md={7}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>Prossimi 7 giorni</Typography>
+                {upcoming7.length === 0 ? (
+                  <Typography color="text.secondary">Nessun appuntamento programmato.</Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {upcoming7.map(a => (
+                      <Paper key={a._id} variant="outlined" sx={{ p: 1.5 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <div>
+                            <Typography fontWeight="bold">{formatDT(a.date)}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {a.patient?.name} {a.patient?.surname} — {a.patient?.email}
+                            </Typography>
+                          </div>
+                          <Chip size="small" label={a.status} />
+                        </Stack>
                       </Paper>
                     ))}
                   </Stack>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Pazienti recenti */}
+            <Grid item xs={12} md={5}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>Pazienti recenti</Typography>
+                {recentPatients.length === 0 ? (
+                  <Typography color="text.secondary">Nessun paziente recente.</Typography>
                 ) : (
-                  <Typography>Nessuna voce nel diario.</Typography>
-                )
-              )}
-              {modalContent === 'questionnaire' && (
-                patientDetails?.questionnaire?.responses?.length > 0 ? (
-                  <Stack spacing={2}>
-                    {patientDetails.questionnaire.responses.map((r, i) => (
-                      <div key={i}>
-                        <Typography fontWeight="bold">{r.question}</Typography>
-                        <Typography sx={{ whiteSpace: 'pre-wrap', pl: 1 }}>{r.answer}</Typography>
-                      </div>
+                  <Stack spacing={1}>
+                    {recentPatients.map(p => (
+                      <Paper key={p._id} variant="outlined" sx={{ p: 1.5 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <div>
+                            <Typography fontWeight="bold">{p.name} {p.surname}</Typography>
+                            <Typography variant="body2" color="text.secondary">{p.email}</Typography>
+                          </div>
+                          <Button size="small" onClick={() => openPatientCard(p)}>Apri scheda</Button>
+                        </Stack>
+                      </Paper>
                     ))}
                   </Stack>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Banners */}
+          {banners.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={2}>
+                {banners.map(b => (
+                  <Grid item xs={12} md={6} key={b.key}>
+                    <Paper variant="outlined" sx={{ p: 2, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <Typography>{b.title}</Typography>
+                      <Button variant="text" onClick={b.onClick}>{b.actionLabel}</Button>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+        </>
+      )}
+
+      {/* Modal scheda paziente (lettura veloce) */}
+      <Dialog open={!!openPatient} onClose={() => setOpenPatient(null)} fullWidth maxWidth="md">
+        <DialogTitle>Scheda paziente — {openPatient ? `${openPatient.name} ${openPatient.surname}` : ''}</DialogTitle>
+        <DialogContent dividers>
+          {loadingDetails && <CircularProgress />}
+          {!loadingDetails && !patientDetails && <Alert severity="error">Impossibile caricare i dettagli.</Alert>}
+          {!loadingDetails && patientDetails && (
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle2">Anagrafica</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Email: {patientDetails.user?.email} — Nato/a: {patientDetails.user?.birthDate ? formatD(patientDetails.user.birthDate) : '—'}
+                </Typography>
+              </Box>
+              <Divider />
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Ultime voci di diario</Typography>
+                {patientDetails.diary?.length ? (
+                  <Stack spacing={1}>
+                    {patientDetails.diary.slice(0,3).map(e => (
+                      <Paper key={e._id} variant="outlined" sx={{ p: 1.5 }}>
+                        <Typography variant="caption" color="text.secondary">{formatDT(e.createdAt)}</Typography>
+                        <Typography sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{e.content}</Typography>
+                      </Paper>
+                    ))}
+                  </Stack>
+                ) : <Typography color="text.secondary">Nessuna voce presente.</Typography>}
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Questionario</Typography>
+                {patientDetails.questionnaire ? (
+                  <Typography variant="body2" color="text.secondary">Compilato il {formatDT(patientDetails.questionnaire.createdAt)}</Typography>
                 ) : (
-                  <Typography>Il paziente non ha ancora compilato il questionario.</Typography>
-                )
-              )}
-            </>
+                  <Typography color="text.secondary">Non ancora compilato.</Typography>
+                )}
+              </Box>
+            </Stack>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setModalContent(null)}>Chiudi</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={rescheduleData.open}
-        onClose={() => setRescheduleData({ ...rescheduleData, open: false })}
-      >
-        <DialogTitle>Riprogramma appuntamento</DialogTitle>
-        <DialogContent>
-          <TextField
-            type="datetime-local"
-            label="Nuova data e ora"
-            InputLabelProps={{ shrink: true }}
-            value={rescheduleData.date}
-            onChange={(e) =>
-              setRescheduleData({ ...rescheduleData, date: e.target.value })
-            }
-            fullWidth
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRescheduleData({ open: false, id: null, date: '' })}>
-            Annulla
-          </Button>
-          <Button onClick={confirmReschedule} variant="contained">
-            Salva
-          </Button>
-        </DialogActions>
       </Dialog>
     </Box>
   );
