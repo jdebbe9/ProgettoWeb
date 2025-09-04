@@ -14,6 +14,7 @@ const appointmentSchema = new Schema(
         'accepted',
         'rejected',
         'cancelled',
+        'rescheduled',     // ⬅️ aggiunto per la riprogrammazione a slot
         // sinonimi legacy accettati per compatibilità (verranno normalizzati)
         'confirmed',
         'declined',
@@ -22,6 +23,14 @@ const appointmentSchema = new Schema(
       default: 'pending',
       index: true,
     },
+
+    // ⬇️ Nuovi campi per la modalità online
+    // Preferenza indicata dal paziente al momento della richiesta
+    requestedOnline: { type: Boolean, default: false },
+
+    // Modalità decisa dal terapeuta all'accettazione
+    isOnline:  { type: Boolean, default: false },
+    videoLink: { type: String, default: '', trim: true },
 
     createdBy: { type: Types.ObjectId, ref: 'User' },
   },
@@ -44,7 +53,6 @@ appointmentSchema.pre('save', function normalizeStatus(next) {
 });
 
 module.exports = model('Appointment', appointmentSchema);
-
 
 
 

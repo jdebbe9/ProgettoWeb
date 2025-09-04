@@ -1,17 +1,20 @@
 // src/pages/therapist/TherapistSchedule.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Box, Paper, Typography, IconButton, Stack, Tooltip, Divider
+  Box, Paper, Typography, IconButton, Stack, Tooltip, Divider,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, CircularProgress, Chip
 } from '@mui/material';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
+import EditCalendarIcon from '@mui/icons-material/EditCalendar';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import LaptopMacIcon from '@mui/icons-material/LaptopMac'; // ⬅️ nuova icona
 import { useAuth } from '../../context/AuthContext';
 import { listAppointments, updateAppointment } from '../../api/appointments';
 import { connectSocket } from '../../realtime/socket';
 import ScheduleTabs from '../../components/ScheduleTabs';
+import { getSlotsAvailability } from '../../api/slots';
 
 const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h per slot
 const WEEK_DAYS = 5; // Lun–Ven
@@ -46,6 +49,7 @@ function fullNameOrEmail(p) {
   const name = [p?.name, p?.surname].filter(Boolean).join(' ').trim();
   return name || p?.email || 'Paziente';
 }
+function safeDate(v){ const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; }
 
 // Stato visivo cella
 function statusToCell(stateRaw) {
@@ -53,7 +57,7 @@ function statusToCell(stateRaw) {
   const s = String(stateRaw).toLowerCase();
   if (s === 'accepted') return 'accepted';
   if (s === 'pending' || s === 'rescheduled') return 'pending';
-  if (s === 'rejected' || s === 'cancelled' || s === 'canceled') return 'free'; // nascosti
+  if (s === 'rejected' || s === 'cancelled' || s === 'canceled') return 'free';
   return 'free';
 }
 
@@ -72,6 +76,23 @@ export default function TherapistSchedule() {
   const [actionBusy, setActionBusy] = useState(false);
   const reloadTmrRef = useRef(null);
 
+  // Dialog: pre-avviso apertura link online
+  const [joinDialog, setJoinDialog] = useState({ open: false, link: '' });
+  const openJoinDialog = (link) => setJoinDialog({ open: true, link });
+  const closeJoinDialog = () => setJoinDialog({ open: false, link: '' });
+  const confirmJoin = () => {
+    const link = joinDialog.link;
+    closeJoinDialog();
+    if (link) window.open(link, '_blank', 'noopener,noreferrer');
+  };
+
+  // Dialog: Riprogramma a slot
+  const [reschedAppt, setReschedAppt] = useState(null);
+  const [reschedWeekStart, setReschedWeekStart] = useState(() => startOfWeekMonday(new Date()));
+  const reschedDays = useMemo(() => Array.from({ length: WEEK_DAYS }, (_, i) => addDays(reschedWeekStart, i)), [reschedWeekStart]);
+  const [reschedAvail, setReschedAvail] = useState({});
+  const [reschedLoading, setReschedLoading] = useState(false);
+
   const loadAppointments = useCallback(async () => {
     if (!isTherapist) return;
     setLoading(true);
@@ -86,27 +107,40 @@ export default function TherapistSchedule() {
     }
   }, [isTherapist]);
 
-  // accept/reject azioni inline
-  const handleAccept = async (id) => {
-    if (!id) return;
-    setActionBusy(true);
+  const loadReschedAvail = useCallback(async () => {
+    setReschedLoading(true);
     try {
-      await updateAppointment(id, { status: 'accepted' });
-      await loadAppointments();
-    } catch (e) {
-      if (import.meta.env.DEV) console.warn('[schedule] accept failed', e);
+      const results = await Promise.all(
+        reschedDays.map(d => getSlotsAvailability(ymd(d)).catch(() => ({ date: ymd(d), slots: [] })))
+      );
+      const map = {};
+      for (const r of results) map[r.date] = Array.isArray(r.slots) ? r.slots : [];
+      setReschedAvail(map);
     } finally {
-      setActionBusy(false);
+      setReschedLoading(false);
     }
+  }, [reschedDays]);
+
+  const openReschedule = (appt) => {
+    if (!appt) return;
+    setReschedAppt(appt);
+    setReschedWeekStart(startOfWeekMonday(new Date(appt.date || Date.now())));
   };
-  const handleReject = async (id) => {
-    if (!id) return;
+
+  const closeReschedule = () => {
+    setReschedAppt(null);
+    setReschedAvail({});
+  };
+
+  const chooseReschedSlot = async (slot) => {
+    if (!reschedAppt || !slot?.start) return;
     setActionBusy(true);
     try {
-      await updateAppointment(id, { status: 'rejected' });
+      await updateAppointment(reschedAppt._id, { date: slot.start });
+      closeReschedule();
       await loadAppointments();
     } catch (e) {
-      if (import.meta.env.DEV) console.warn('[schedule] reject failed', e);
+      if (import.meta.env.DEV) console.warn('[schedule] reschedule failed', e);
     } finally {
       setActionBusy(false);
     }
@@ -140,6 +174,7 @@ export default function TherapistSchedule() {
   }, [isTherapist, uid, loadAppointments]);
 
   useEffect(() => { loadAppointments(); }, [loadAppointments]);
+  useEffect(() => { if (reschedAppt) loadReschedAvail(); }, [reschedAppt, reschedWeekStart, loadReschedAvail]);
 
   // indicizza per slot (ignora rejected/cancelled)
   const slotMap = useMemo(() => {
@@ -153,7 +188,7 @@ export default function TherapistSchedule() {
     for (const a of items) {
       if (!a?.date) continue;
       const s = String(a.status || '').toLowerCase();
-      if (s === 'rejected' || s === 'cancelled' || s === 'canceled') continue; // nascondi
+      if (s === 'rejected' || s === 'cancelled' || s === 'canceled') continue;
       const d = new Date(a.date);
       const h = d.getHours();
       if (!SLOT_HOURS.includes(h)) continue;
@@ -179,7 +214,6 @@ export default function TherapistSchedule() {
 
   return (
     <Box className="container" sx={{ mt: 3, maxWidth: 1100 }}>
-      {/* ⬇️ Aggiunta: Tab Calendario / Richieste / Disponibilità */}
       <ScheduleTabs />
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -248,17 +282,100 @@ export default function TherapistSchedule() {
               slotMap={slotMap}
               loading={loading}
               actionBusy={actionBusy}
-              onAccept={handleAccept}
-              onReject={handleReject}
+              onReschedule={openReschedule}
+              onOpenLink={(link) => openJoinDialog(link)}
             />
           ))}
         </Box>
       </Paper>
+
+      {/* Dialog pre-avviso apertura link */}
+      <Dialog open={joinDialog.open} onClose={closeJoinDialog} fullWidth maxWidth="xs">
+        <DialogTitle>Apri la visita online?</DialogTitle>
+        <DialogContent>
+          <Alert severity="info">
+            Verrai reindirizzato al link della videochiamata in una nuova scheda.
+          </Alert>
+          <Typography variant="body2" sx={{ mt: 2, wordBreak: 'break-all' }}>{joinDialog.link}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeJoinDialog}>Annulla</Button>
+          <Button variant="contained" onClick={confirmJoin} startIcon={<OpenInNewIcon />}>Apri link</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog Riprogramma a slot */}
+      <Dialog open={Boolean(reschedAppt)} onClose={closeReschedule} fullWidth maxWidth="md">
+        <DialogTitle>Riprogramma appuntamento</DialogTitle>
+        <DialogContent dividers>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Tooltip title="Settimana precedente">
+                <IconButton onClick={() => setReschedWeekStart(addDays(reschedWeekStart, -7))}><ChevronLeft /></IconButton>
+              </Tooltip>
+              <Tooltip title="Settimana successiva">
+                <IconButton onClick={() => setReschedWeekStart(addDays(reschedWeekStart, +7))}><ChevronRight /></IconButton>
+              </Tooltip>
+              <Tooltip title="Questa settimana">
+                <IconButton onClick={() => setReschedWeekStart(startOfWeekMonday(new Date()))}><TodayIcon /></IconButton>
+              </Tooltip>
+              <Typography variant="subtitle1" sx={{ ml: 1 }}>
+                Seleziona uno slot libero — {italianDateRangeLabel(reschedDays[0], reschedDays[4])}
+              </Typography>
+            </Stack>
+            {reschedAppt && (
+              <Chip
+                size="small"
+                label={`${fullNameOrEmail(reschedAppt.patient)} • ${new Date(reschedAppt.date).toLocaleString('it-IT')}`}
+              />
+            )}
+          </Stack>
+
+          <Divider sx={{ mb: 1 }} />
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '120px repeat(5, 1fr)',
+              alignItems: 'stretch',
+              px: 1,
+            }}
+          >
+            <Box />
+            {reschedDays.map((d) => (
+              <Box key={ymd(d)} sx={{ textAlign: 'center', py: 1 }}>
+                <Typography variant="subtitle2">
+                  {d.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                </Typography>
+              </Box>
+            ))}
+
+            {reschedLoading ? (
+              <Box sx={{ gridColumn: '1 / -1', py: 4, display: 'grid', placeItems: 'center' }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              SLOT_HOURS.map((h) => (
+                <ReschedRow
+                  key={h}
+                  hour={h}
+                  days={reschedDays}
+                  avail={reschedAvail}
+                  onPick={chooseReschedSlot}
+                />
+              ))
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeReschedule}>Chiudi</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
 
-function SlotRow({ hour, days, slotMap, loading, actionBusy, onAccept, onReject }) {
+function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpenLink }) {
   const label = `${String(hour).padStart(2, '0')}:00`;
 
   return (
@@ -273,14 +390,14 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onAccept, onReject 
         const appt = slotMap.get(key);
         const cellState = statusToCell(appt?.status); // 'accepted' | 'pending' | 'free'
 
-        // Stili per stato
         const stateSx =
           cellState === 'accepted'
             ? { bgcolor: 'success.main', color: 'success.contrastText', borderColor: 'success.dark' }
             : cellState === 'pending'
             ? { bgcolor: 'warning.main', color: 'warning.contrastText', borderColor: 'warning.dark' }
-            : // free → bianco
-              { color: 'text.primary', borderColor: 'divider' };
+            : { color: 'text.primary', borderColor: 'divider' };
+
+        const isOnlineAccepted = appt && String(appt.status).toLowerCase() === 'accepted' && appt.isOnline && appt.videoLink;
 
         return (
           <Paper
@@ -288,11 +405,13 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onAccept, onReject 
             variant="outlined"
             sx={{
               p: 1,
+              pr: isOnlineAccepted ? 5 : 1, // spazio a destra per l'icona
               minHeight: 56,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 1,
+              position: 'relative',
               ...stateSx,
             }}
           >
@@ -309,33 +428,43 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onAccept, onReject 
                   </Typography>
                 </Stack>
 
-                {String(appt.status).toLowerCase() === 'pending' && (
-                  <Stack direction="row" spacing={0.5}>
-                    <Tooltip title="Accetta">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => onAccept(appt._id)}
-                          disabled={actionBusy}
-                          sx={{ color: 'inherit' }}
-                        >
-                          <CheckIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Rifiuta">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => onReject(appt._id)}
-                          disabled={actionBusy}
-                          sx={{ color: 'inherit' }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
+                {/* Azione a destra: SOLO riprogramma */}
+                <Stack direction="row" spacing={0.5}>
+                  <Tooltip title="Riprogramma su altro slot">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => onReschedule(appt)}
+                        disabled={actionBusy}
+                        sx={{ color: 'inherit',
+                          position: 'absolute',
+                          right: 7,
+                          bottom: 25,
+                        }}
+                      >
+                        <EditCalendarIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
+
+                {/* Icona laptop in basso a destra (piccola, b/n) */}
+                {isOnlineAccepted && (
+                  <Tooltip title="Apri visita online">
+                    <IconButton
+                      size="small"
+                      onClick={() => onOpenLink(appt.videoLink)}
+                      sx={{
+                        position: 'absolute',
+                        right: 9,
+                        bottom: 5,
+                        color: 'common.white',    // b/n (bianco)
+                      }}
+                      aria-label="Apri link visita online"
+                    >
+                      <LaptopMacIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                 )}
               </>
             ) : (
@@ -350,6 +479,48 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onAccept, onReject 
   );
 }
 
+function ReschedRow({ hour, days, avail, onPick }) {
+  const label = `${String(hour).padStart(2, '0')}:00`;
+
+  return (
+    <>
+      {/* colonna orario */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', pr: 1 }}>
+        <Typography variant="body2">{label}</Typography>
+      </Box>
+
+      {days.map((d) => {
+        const dateStr = ymd(d);
+        const slots = avail[dateStr] || [];
+        const slot = slots.find(s => {
+          const ds = safeDate(s.start);
+          return ds && ds.getHours() === hour;
+        });
+
+        const isFree = slot && !slot.busy && !slot.isPast;
+
+        return (
+          <Box key={`${dateStr}-${hour}`} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {slot ? (
+              <Button
+                size="small"
+                variant={isFree ? 'outlined' : 'text'}
+                disabled={!isFree}
+                onClick={() => isFree && onPick(slot)}
+                sx={{ height: 40, minWidth: 88 }}
+              >
+                {isFree ? 'Scegli' : '—'}
+              </Button>
+            ) : (
+              <Typography variant="body2" sx={{ opacity: 0.6 }}>—</Typography>
+            )}
+          </Box>
+        );
+      })}
+    </>
+  );
+}
+
 function prettyStatus(statusRaw) {
   const s = String(statusRaw || '').toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -358,5 +529,7 @@ function prettyStatus(statusRaw) {
 function LegendDot({ sx }) {
   return <Box sx={{ width: 12, height: 12, borderRadius: '50%', ...sx }} />;
 }
+
+
 
 
