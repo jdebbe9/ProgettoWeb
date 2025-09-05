@@ -7,8 +7,10 @@ const AssignmentSchema = new mongoose.Schema({
   itemType:  { type: String, enum: ['Article', 'Book'], required: true },
   item:      { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'itemType' },
   status:    { type: String, enum: ['assigned','in_progress','done'], default: 'assigned', index: true },
-  note:      { type: String, default: '' },
+  note:      { type: String, trim: true, default: '' }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Assignment', AssignmentSchema);
+// Evita doppie assegnazioni dello stesso materiale allo stesso paziente
+AssignmentSchema.index({ patient: 1, itemType: 1, item: 1 }, { unique: true });
 
+module.exports = mongoose.model('Assignment', AssignmentSchema);

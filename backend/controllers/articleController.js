@@ -5,6 +5,41 @@ function getUserId(req) {
   return (req?.user && (req.user._id || req.user.id)) || req?.auth?.userId || null;
 }
 
+// GET /api/articles/public?q=&tag=&limit=&author=
+exports.listPublishedArticles = async (req, res, next) => {
+  try {
+    const { q, tag, limit, author } = req.query;
+
+    const where = { status: 'published' };
+    if (author) where.author = author;
+    if (tag) where.tags = { $in: [tag] };
+
+    let query = Article.find(where).sort({ updatedAt: -1 });
+
+    if (q) {
+      const rx = new RegExp(q, 'i');
+      query = Article.find({
+        ...where,
+        $or: [{ title: rx }, { abstract: rx }, { body: rx }, { tags: rx }]
+      }).sort({ updatedAt: -1 });
+    }
+
+    const lim = Math.min(parseInt(limit, 10) || 20, 100);
+    const items = await query.limit(lim).lean();
+
+    res.json({ items });
+  } catch (e) { next(e); }
+};
+
+// GET /api/articles/public/:id
+exports.getPublishedArticle = async (req, res, next) => {
+  try {
+    const doc = await Article.findOne({ _id: req.params.id, status: 'published' }).lean();
+    if (!doc) return res.status(404).json({ message: 'Articolo non trovato o non pubblicato' });
+    res.json(doc);
+  } catch (e) { next(e); }
+};
+
 // GET /api/articles?q=&status=&tag=
 exports.listArticles = async (req, res, next) => {
   try {

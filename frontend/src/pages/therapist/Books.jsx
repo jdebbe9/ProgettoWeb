@@ -1,7 +1,9 @@
+// frontend/src/pages/therapist/Books.jsx
 import { useEffect, useState, useCallback } from 'react';
 import { Box, Stack, Typography, TextField, Select, MenuItem, Button, Grid, Paper, Chip, Alert } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { listBooks, deleteBook } from '../../api/books';
+import AssignMaterialDialog from '../../components/AssignMaterialDialog';
 
 function statusLabel(s) {
   if (s === 'reading') return 'In lettura';
@@ -14,18 +16,28 @@ export default function Books() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [err, setErr] = useState('');
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignItem, setAssignItem] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
     try {
       const data = await listBooks({ q: q || undefined, status: status || undefined });
       setItems(data);
+      setErr('');
     } catch {
       setErr('Errore nel caricamento libri');
     }
   }, [q, status]);
 
   useEffect(() => { load(); }, [load]);
+
+  const openAssign = (item) => { setAssignItem(item); setAssignOpen(true); };
+  const closeAssign = (didAssign) => {
+    setAssignOpen(false);
+    setAssignItem(null);
+    if (didAssign) load();
+  };
 
   return (
     <Box sx={{ p:2 }}>
@@ -61,8 +73,20 @@ export default function Books() {
                 </div>
                 <Stack direction="row" spacing={1}>
                   <Chip size="small" label={statusLabel(b.status)} />
+                  <Button size="small" onClick={() => openAssign(b)}>Assegna</Button>
                   <Button size="small" component={RouterLink} to={`/therapist/books/${b._id}`}>Modifica</Button>
-                  <Button size="small" color="error" onClick={async () => { if (confirm('Eliminare questo libro?')) { await deleteBook(b._id); load(); } }}>Elimina</Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={async () => {
+                      if (confirm('Eliminare questo libro?')) {
+                        await deleteBook(b._id);
+                        load();
+                      }
+                    }}
+                  >
+                    Elimina
+                  </Button>
                 </Stack>
               </Stack>
             </Paper>
@@ -72,6 +96,14 @@ export default function Books() {
           <Grid item xs={12}><Alert severity="info">Nessun libro trovato.</Alert></Grid>
         )}
       </Grid>
+
+      <AssignMaterialDialog
+        open={assignOpen}
+        onClose={closeAssign}
+        itemType="Book"
+        item={assignItem}
+      />
     </Box>
   );
 }
+

@@ -5,6 +5,10 @@ const QuestionnaireResponse = require('../models/QuestionnaireResponse');
 const DiaryEntry = require('../models/DiaryEntry');
 const Appointment = require('../models/Appointment');
 
+function escRx(s = '') {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * GET /api/therapists/patients
  * Elenco pazienti (solo per terapeuti).
@@ -39,6 +43,51 @@ exports.getAllPatients = async (req, res) => {
     });
   } catch (err) {
     console.error('Errore lettura pazienti:', err);
+    res.status(500).json({ message: 'Errore interno' });
+  }
+};
+
+/**
+ * GET /api/therapists/patients (ricerca) oppure /api/therapists/patients/search
+ * Ricerca pazienti per prefisso su name/surname e anche su "name surname".
+ * Parametri: ?q=Vito&limit=10
+ * Solo terapeuta.
+ */
+exports.searchPatients = async (req, res) => {
+  try {
+    if (req.user?.role !== 'therapist') {
+      return res.status(403).json({ message: 'Permesso negato' });
+    }
+
+    const q = String(req.query.q || '').trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10), 1), 50);
+
+    if (q.length < 2) {
+      return res.json({ items: [] });
+    }
+
+    const rx = new RegExp('^' + escRx(q), 'i');        // prefisso su singolo campo
+    const rxStr = '^' + escRx(q);                      // per $regexMatch in $expr
+
+    const where = {
+      role: 'patient',
+      $or: [
+        { name: rx },
+        { surname: rx },
+        // Prefisso su "name surname" (es. "Vito Ro")
+        { $expr: { $regexMatch: { input: { $concat: ['$name', ' ', '$surname'] }, regex: rxStr, options: 'i' } } }
+      ]
+    };
+
+    const items = await User.find(where)
+      .select('_id name surname') // NO email
+      .sort({ name: 1, surname: 1 })
+      .limit(limit)
+      .lean();
+
+    res.json({ items });
+  } catch (err) {
+    console.error('Errore ricerca pazienti:', err);
     res.status(500).json({ message: 'Errore interno' });
   }
 };

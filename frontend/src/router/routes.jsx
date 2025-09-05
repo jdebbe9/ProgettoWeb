@@ -1,3 +1,4 @@
+// frontend/src/routes/index.jsx
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import App from '../App'
 import Login from '../pages/Login'
@@ -16,7 +17,7 @@ import Home from '../pages/Home'
 import Profile from '../pages/Profile'
 import Patients from '../pages/therapist/Patients';
 import PatientDetails from '../pages/therapist/PatientDetails';
-
+import ArticlePublic from '../pages/ArticlePublic'; // <-- percorso corretto
 
 // ⬇️ percorso CORRETTO (una cartella sopra)
 import TherapistSchedule from '../pages/therapist/TherapistSchedule'
@@ -29,9 +30,6 @@ import Books from '../pages/therapist/Books';
 import BookEditor from '../pages/therapist/BookEditor';
 import Materials from '../pages/Materials';
 import Goals from '../pages/Goals';
-import SafetyPlan from '../pages/SafetyPlan';
-
-
 
 
 export const router = createBrowserRouter([
@@ -58,7 +56,9 @@ export const router = createBrowserRouter([
           { path: 'profile',       element: <Profile /> },
           { path: 'materials',     element: <Materials /> },
           { path: 'goals',         element: <Goals /> },
-          { path: 'safety-plan',   element: <SafetyPlan /> },
+          
+          // lettura articolo pubblicato (paziente)
+          { path: 'articles/:id',  element: <ArticlePublic /> },
         ]
       },
 
@@ -67,28 +67,26 @@ export const router = createBrowserRouter([
         path: 'therapist',
         element: <ProtectedRoute roles={['therapist']} />,
         children: [
-          { index: true,           element: <Navigate to="dashboard" replace /> },
-          { path: 'dashboard',     element: <TherapistDashboard /> },
-          
-          { path: 'schedule',      element: <TherapistSchedule /> },
-          { path: 'schedule/requests',      element: <ScheduleRequests /> },
-          { path: 'schedule/availability',  element: <ScheduleAvailability /> },
-          { path: 'patients',      element: <Patients /> },
-          { path: 'patients/:id',  element: <PatientDetails /> },
-          { path: 'articles',        element: <Articles /> },
-          { path: 'articles/new',    element: <ArticleEditor /> },
-          { path: 'articles/:id',    element: <ArticleEditor /> },
-          { path: 'books',           element: <Books /> },
-          { path: 'books/new',       element: <BookEditor /> },
-          { path: 'books/:id',       element: <BookEditor /> },
-          { path: 'profile',   element: <TherapistProfile /> },
+          { index: true,                element: <Navigate to="dashboard" replace /> },
+          { path: 'dashboard',          element: <TherapistDashboard /> },
+          { path: 'schedule',           element: <TherapistSchedule /> },
+          { path: 'schedule/requests',  element: <ScheduleRequests /> },
+          { path: 'schedule/availability', element: <ScheduleAvailability /> },
+          { path: 'patients',           element: <Patients /> },
+          { path: 'patients/:id',       element: <PatientDetails /> },
+          { path: 'articles',           element: <Articles /> },
+          { path: 'articles/new',       element: <ArticleEditor /> },
+          { path: 'articles/:id',       element: <ArticleEditor /> },
+          { path: 'books',              element: <Books /> },
+          { path: 'books/new',          element: <BookEditor /> },
+          { path: 'books/:id',          element: <BookEditor /> },
+          { path: 'profile',            element: <TherapistProfile /> },
         ]
       }
     ]
   },
   { path: '*', element: <NotFound /> }
 ])
-
 
 
 

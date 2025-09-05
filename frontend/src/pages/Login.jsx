@@ -1,125 +1,119 @@
-// src/pages/Login.jsx
-import { useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { zodResolver } from '@hookform/resolvers/zod'
+// frontend/src/pages/Login.jsx
+import { useState } from 'react';
 import {
-  Alert, Box, Button, MenuItem, Paper, TextField, Typography,
-  InputAdornment, IconButton, FormControl, OutlinedInput, InputLabel, FormHelperText
-} from '@mui/material'
-import Visibility from '@mui/icons-material/Visibility'
-import VisibilityOff from '@mui/icons-material/VisibilityOff'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+  Box, Paper, Stack, TextField, Button, Typography, Alert,
+  IconButton, InputAdornment
+} from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const schema = z.object({
-  email: z.string().email('Email non valida'),
-  password: z.string().min(6, 'Min 6 caratteri'),
-  role: z.enum(['patient', 'therapist'])
-})
+// ───────────────────────────────────────────────────────────────
+// Pannello riutilizzabile (named export)
+export function LoginPanel() {
+  const { login } = useAuth() || {};
+  const navigate = useNavigate();
 
-export default function Login() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: { role: 'patient' }
-  })
-  // ⬇⬇⬇ aggiungo logout e un ref per capire se è in corso il submit
-  const { login, logout, user } = useAuth()
-  const duringSubmitRef = useRef(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const [error, setError] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const navigate = useNavigate()
-
-  // ⬇⬇⬇ redireziona solo se NON siamo nel mezzo di un submit
-  useEffect(() => {
-    if (user && !duringSubmitRef.current) {
-      navigate(user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard', { replace: true })
+  const onSubmit = async (e) => {
+    e?.preventDefault?.();
+    setErr('');
+    if (!email || !password) {
+      setErr('Inserisci email e password.');
+      return;
     }
-  }, [user, navigate])
-
-  const onSubmit = async ({ email, password, role }) => {
-    setError('')
-    duringSubmitRef.current = true // ⬅ blocca il redirect dell'useEffect
+    setBusy(true);
     try {
-      const u = await login(email, password) // ritorna l’utente
-      if (!u) { setError('Impossibile determinare il ruolo.'); return }
-
-      // ruolo richiesto dall'utente ≠ ruolo reale dell'account
-      if (u.role !== role) {
-        setError(`Accesso non autorizzato.`)
-        // ⬇ IMPORTANTE: azzera user per evitare redirect automatico
-        await logout()
-        return
-      }
-
-      navigate(u.role === 'therapist' ? '/therapist/dashboard' : '/dashboard', { replace: true })
-    } catch {
-      setError('Credenziali non valide.')
+      const who = await login?.(email, password);
+      const role = who?.role || who?.user?.role;
+      if (role === 'therapist') navigate('/therapist/dashboard');
+      else navigate('/dashboard');
+    } catch (e2) {
+      const msg = e2?.response?.data?.message || 'Credenziali non valide.';
+      setErr(msg);
     } finally {
-      duringSubmitRef.current = false // riabilita redirect normale
+      setBusy(false);
     }
-  }
+  };
 
   return (
-    <Box className="container" sx={{ mt: 6, maxWidth: 460 }}>
-      <Paper sx={{ p: 3 }} elevation={3}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Accedi</Typography>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Paper
+      variant="outlined"
+      sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2, position: 'sticky', top: { xs: 16, md: 24 } }}
+      component="form"
+      onSubmit={onSubmit}
+    >
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Accedi
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Entra nel tuo spazio personale.
+          </Typography>
+        </Box>
 
-        <form className="stack" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <TextField
-            label="Email"
-            type="email"
-            autoComplete="email"
-            {...register('email')}
-            error={!!errors.email}
-            helperText={errors.email?.message}
-            fullWidth
-          />
+        {err && <Alert severity="error">{err}</Alert>}
 
-          <FormControl variant="outlined" fullWidth error={!!errors.password}>
-            <InputLabel htmlFor="login-password">Password</InputLabel>
-            <OutlinedInput
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              endAdornment={
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
-                    onClick={() => setShowPassword(p => !p)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              }
-              label="Password"
-              {...register('password')}
-            />
-            {errors.password && <FormHelperText>{errors.password.message}</FormHelperText>}
-          </FormControl>
+        <TextField
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          fullWidth
+        />
+        <TextField
+          label="Password"
+          type={showPw ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          fullWidth
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => setShowPw(s => !s)} edge="end" aria-label="mostra/nascondi password">
+                  {showPw ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
 
-          <TextField select label="Ruolo" defaultValue="patient" {...register('role')} fullWidth>
-            <MenuItem value="patient">Paziente</MenuItem>
-            <MenuItem value="therapist">Terapeuta</MenuItem>
-          </TextField>
+        <Button type="submit" variant="contained" disabled={busy} fullWidth>
+          {busy ? 'Accesso…' : 'Accedi'}
+        </Button>
 
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Accesso…' : 'Login'}
-          </Button>
-        </form>
+        <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+          <Typography variant="body2">
+            <RouterLink to="/forgot-password">Password dimenticata?</RouterLink>
+          </Typography>
+          <Typography variant="body2">
+            <RouterLink to="/register">Crea un account</RouterLink>
+          </Typography>
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
 
-        <Typography sx={{ mt: 2 }} variant="body2">
-          Non hai un account? <Link to="/register">Registrati</Link>
-          {' · '}
-          <Link to="/forgot-password">Password dimenticata?</Link>
-        </Typography>
-      </Paper>
+// ───────────────────────────────────────────────────────────────
+// Pagina /login “bianca” che riusa il pannello
+export default function Login() {
+  return (
+    <Box sx={{ px: 2, py: 6, display: 'flex', justifyContent: 'center' }}>
+      <Box sx={{ width: 420, maxWidth: '100%' }}>
+        <LoginPanel />
+      </Box>
     </Box>
-  )
+  );
 }
 
 

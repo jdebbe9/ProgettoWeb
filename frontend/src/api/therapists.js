@@ -12,3 +12,7 @@ export async function getPatientDetails(id) {
   const { data } = await api.get(`/therapists/patients/${id}`);
   return data;
 }
+export async function searchPatients(params = {}) {
+  const { data } = await api.get('/therapists/patients', { params }); // supporta ?q= e ?limit=
+  return Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+}

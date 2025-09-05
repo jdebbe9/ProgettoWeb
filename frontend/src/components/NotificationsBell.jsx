@@ -18,11 +18,15 @@ function formatDate(ts) {
   return d.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 }
 
+// Fallback di rotta se manca n.link dal backend
 function routeFor(notifType, role) {
   const t = String(notifType || '').toUpperCase();
   const isTher = role === 'therapist';
-  if (t.startsWith('APPT_')) return isTher ? '/therapist/dashboard' : '/appointments';
+
+  if (t === 'READING_ASSIGNED') return isTher ? '/therapist/dashboard' : '/materials';
+  if (t.startsWith('APPT_'))     return isTher ? '/therapist/dashboard' : '/appointments';
   if (t === 'QUESTIONNAIRE_COMPLETED') return isTher ? '/therapist/dashboard' : '/dashboard';
+
   return isTher ? '/therapist/dashboard' : '/dashboard';
 }
 
@@ -120,19 +124,22 @@ export default function NotificationsBell() {
 
   // ---- interazioni
   function onItemClick(n) {
+    const id = n?._id || n?.id;
     const go = () => {
-      const target = routeFor(n.type, user?.role);
+      const target = (n && typeof n.link === 'string' && n.link) || routeFor(n?.type, user?.role);
       closeMenu();
       navigate(target);
     };
 
-    if (!isRead(n)) {
-      markRead(n._id)
+    if (!isRead(n) && id) {
+      markRead(id)
         .catch(() => {})
         .finally(() => {
           setItems((prev) =>
             prev.map((x) =>
-              x._id === n._id ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true } : x
+              (x._id || x.id) === id
+                ? { ...x, readAt: x.readAt || new Date().toISOString(), read: true, isRead: true }
+                : x
             )
           );
           // prendo il numero reale dal server (così vado sicuro)
@@ -145,22 +152,36 @@ export default function NotificationsBell() {
   }
 
   function onMarkAll() {
-    setActionBusy(true);
-    markAllRead()
-      .then(() =>
-        Promise.all([
-          getUnreadCount().catch(() => 0),
-          listNotifications({ limit: 20 }).catch(() => null),
-        ])
-      )
-      .then(([c, resp]) => {
-        setUnread(Number(c) || 0);
-        const list = Array.isArray(resp) ? resp : resp?.items;
-        if (Array.isArray(list)) setItems(list);
-      })
-      .catch(() => {})
-      .finally(() => setActionBusy(false));
-  }
+  setActionBusy(true);
+
+  // ✅ Ottimistico: segna tutto letto SUBITO in UI
+  setItems(prev =>
+    prev.map(n => ({
+      ...n,
+      readAt: n.readAt || new Date().toISOString(),
+      read: true,
+      isRead: true,
+    }))
+  );
+  setUnread(0);
+
+  // Chiamata API (qualsiasi esito) + riallineo con il server
+  markAllRead()
+    .catch(() => { /* non blocco: ricarico comunque da server */ })
+    .finally(() => {
+      Promise.all([
+        getUnreadCount().catch(() => 0),
+        listNotifications({ limit: 20 }).catch(() => null),
+      ])
+        .then(([c, resp]) => {
+          setUnread(Number(c) || 0);
+          const list = Array.isArray(resp) ? resp : resp?.items;
+          if (Array.isArray(list)) setItems(list);
+        })
+        .finally(() => setActionBusy(false));
+    });
+}
+
 
   function onClearAll() {
     setActionBusy(true);
@@ -225,9 +246,10 @@ export default function NotificationsBell() {
           <List dense disablePadding>
             {items.map((n) => {
               const unreadDot = !isRead(n);
+              const key = n?._id || n?.id;
               return (
                 <ListItemButton
-                  key={n._id}
+                  key={key}
                   onClick={() => onItemClick(n)}
                   sx={{ alignItems: 'flex-start', py: 1.2 }}
                 >
@@ -242,7 +264,7 @@ export default function NotificationsBell() {
                     }
                     secondary={
                       <Typography variant="caption" sx={{ display: 'block', mt: 0.25 }}>
-                        {n.body || formatDate(n.createdAt)}
+                        {n.message || n.body || formatDate(n.createdAt)}
                       </Typography>
                     }
                   />
