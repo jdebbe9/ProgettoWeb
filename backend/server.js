@@ -26,6 +26,7 @@ const bookRoutes = require('./routes/bookRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const safetyPlanRoutes = require('./routes/safetyPlanRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -81,6 +82,8 @@ app.use('/api/books', bookRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/safety-plan', safetyPlanRoutes);
+app.use('/api/user', userRoutes);
+
 
 /* 404 & error handler */
 app.use(notFound);

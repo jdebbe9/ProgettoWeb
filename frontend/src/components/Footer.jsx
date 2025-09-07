@@ -15,7 +15,15 @@ const YEAR = new Date().getFullYear();
 
 export default function Footer() {
   return (
-    <Box component="footer" sx={{ mt: 6, bgcolor: 'background.paper', borderTop: (t)=>`1px solid ${t.palette.divider}` }}>
+    <Box
+      component="footer"
+      sx={{
+        // ↑ più spazio tra contenuto pagina e footer
+        mt: { xs: 14, sm: 38 },
+        bgcolor: 'background.paper',
+        borderTop: (t) => `1px solid ${t.palette.divider}`,
+      }}
+    >
       <Container sx={{ py: { xs: 3, sm: 5 } }}>
         <Grid container spacing={4}>
           {/* Colonna 1: Studio */}
@@ -50,7 +58,6 @@ export default function Footer() {
                 <EmailIcon fontSize="small" />
                 <Typography variant="body2">
                   <MuiLink href="mailto:info@psicocare.it">info@psicocare.it</MuiLink>
-                  {/* , PEC: <MuiLink href="mailto:studio@pec.it">studio@pec.it</MuiLink> */}
                 </Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
@@ -76,7 +83,6 @@ export default function Footer() {
               <MuiLink component={RouterLink} to="/terms" underline="hover">Termini di servizio</MuiLink>
               <MuiLink component={RouterLink} to="/cookies" underline="hover">Cookie</MuiLink>
               <MuiLink component={RouterLink} to="/accessibility" underline="hover">Accessibilità</MuiLink>
-              {/* <MuiLink component="button" onClick={openCookiePrefs}>Preferenze cookie</MuiLink> */}
             </Stack>
           </Grid>
 
@@ -102,8 +108,7 @@ export default function Footer() {
 
             <Box sx={{ mt: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                P.IVA: <em>[IT01234567890]</em> &nbsp;•&nbsp; {/*
-                SDI: <em>[XXXXXXX]</em> &nbsp;•&nbsp; */}
+                P.IVA: <em>[IT01234567890]</em> &nbsp;•&nbsp;
                 Informativa telemedicina / consenso informato disponibile su richiesta.
               </Typography>
             </Box>
@@ -122,9 +127,7 @@ export default function Footer() {
           <Typography variant="body2" color="text.secondary">
             © {YEAR} Studio PsicoCare — Tutti i diritti riservati.
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Costruito con PsicoCare • Versione {import.meta?.env?.VITE_APP_VERSION || '1.0'}
-          </Typography>
+          
         </Stack>
       </Container>
     </Box>

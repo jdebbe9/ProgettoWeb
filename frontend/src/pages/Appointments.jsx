@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { createAppointment, listAppointments } from '../api/appointments';
 import { getSlotsAvailability } from '../api/slots';
 import { connectSocket } from '../realtime/socket';
+import { me as fetchMe } from '../api/auth'; // ⬅️ per verificare completezza profilo
 
 const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta';
 const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h slot, lun–ven
@@ -81,6 +82,9 @@ export default function Appointments() {
   const reloadTmrRef = useRef(null);
   const uid = user?._id || user?.id;
 
+  // ⬇️ profilo completo?
+  const [profileOk, setProfileOk] = useState(true);
+
   const today = useMemo(() => new Date(), []);
   const tomorrow0 = useMemo(() => { const t = new Date(); t.setDate(t.getDate()+1); t.setHours(0,0,0,0); return t; }, []);
 
@@ -106,6 +110,26 @@ export default function Appointments() {
       setSlotsLoading(false);
     }
   }, [weekDays]);
+
+  // ⬇️ carica profilo per controllare completezza
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      try {
+        const data = await fetchMe();
+        if (!on) return;
+        const ok =
+          Boolean(data?.profileComplete) ||
+          ['name','surname','email','address','city','cap','phone']
+            .every(k => String(data?.[k] ?? '').trim().length > 0);
+        setProfileOk(ok);
+      } catch {
+        // se fallisce la lettura profilo, non blocchiamo: lasciamo profileOk=true
+        setProfileOk(true);
+      }
+    })();
+    return () => { on = false; };
+  }, [user]);
 
   // first loads
   useEffect(() => { if (user) fetchAppointments(); }, [user, fetchAppointments]);
@@ -215,6 +239,7 @@ export default function Appointments() {
   }
 
   function openModeDialog(slot) {
+    if (!profileOk) { showSnack('Completa il tuo profilo prima di prenotare.', 'warning'); return; } // ⬅️ blocco profilo
     if (!questionnaireDone) { showSnack('Prima completa il questionario.', 'warning'); return; }
     const start = safeDate(slot?.start);
     const end = safeDate(slot?.end);
@@ -258,6 +283,21 @@ export default function Appointments() {
   return (
     <Box className="container" sx={{ mt: 3, maxWidth: 1200 }}>
       <Typography variant="h5" sx={{ mb: 1 }}>Appuntamenti</Typography>
+
+      {/* ⬇️ Avviso profilo incompleto */}
+      {!profileOk && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => navigate('/profile')}>
+              Vai al profilo
+            </Button>
+          }
+        >
+          <strong>Completa il tuo profilo</strong> per poter prenotare appuntamenti.
+        </Alert>
+      )}
 
       {/* Tabs: Calendario / I miei Appuntamenti */}
       <Paper sx={{ mb: 2 }}>
@@ -540,7 +580,6 @@ function PatientSlotRow({
                   onClick={(e) => { e.stopPropagation(); onJoin(myAppt.videoLink); }}
                   sx={{
                     position: 'center',
-                  
                     left : 3.5,
                     color: 'common.white',
                   }}
