@@ -1,16 +1,41 @@
+// backend/controllers/diaryController.js
 const mongoose = require('mongoose');
 const DiaryEntry = require('../models/DiaryEntry');
 
-// POST /api/diary
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const ALLOWED_EMOTIONS = DiaryEntry.ALLOWED_EMOTIONS || [
+  'gioia','tristezza','rabbia','ansia','paura','calma','sorpresa','disgusto',
+  'amore','gratitudine','frustrazione','solitudine','speranza','colpa',
+  'vergogna','orgoglio','eccitazione','sollievo','noia','confusione'
+];
+
+function normalizeContent(value) {
+  return ((value ?? '') + '').trim();
+}
+function coerceMood(value, def = 3) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1 || n > 5) return def;
+  return n;
+}
+function normalizeEmotions(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((e) => (e ?? '').toString().trim().toLowerCase())
+    .filter(Boolean)
+    .filter((e) => ALLOWED_EMOTIONS.includes(e));
+}
+
+/**
+ * POST /api/diary
+ * Crea una nuova voce diario.
+ * Body: { content?, mood?, emotions?, shared? }
+ */
 exports.createDiaryEntry = async (req, res) => {
   try {
-    const { content: bodyContent, shared } = req.body || {};
-    const raw = (bodyContent ?? '').toString();
-    const content = raw.trim();
+    const { content: bodyContent, mood, emotions, shared } = req.body || {};
 
-    if (!content) {
-      return res.status(400).json({ message: 'Il contenuto è obbligatorio' });
-    }
+    // content è facoltativo ma max 5000
+    const content = normalizeContent(bodyContent);
     if (content.length > 5000) {
       return res.status(400).json({ message: 'Il contenuto supera i 5000 caratteri' });
     }
@@ -18,39 +43,66 @@ exports.createDiaryEntry = async (req, res) => {
     const entry = await DiaryEntry.create({
       user: req.user.id,
       content,
-      shared: shared !== undefined ? !!shared : true
+      mood: coerceMood(mood, 3),
+      emotions: normalizeEmotions(emotions),
+      shared: typeof shared === 'boolean' ? shared : true
     });
 
     return res.status(201).json(entry);
   } catch (err) {
     console.error('Errore creazione diario:', err);
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message });
+    }
     return res.status(500).json({ message: 'Errore interno' });
   }
 };
 
-// GET /api/diary
-// Ritorna le entry dell’utente corrente (ultime per prime).
-// Facoltativo: ?page=1&limit=20
+/**
+ * GET /api/diary?page=&limit=
+ * Lista le voci dell’utente, ordinate per data (desc).
+ * Query opzionali: mood (1..5), hasEmotions=true, from, to (ISO date)
+ */
 exports.getMyDiaryEntries = async (req, res) => {
   try {
-    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
-    const skip  = (page - 1) * limit;
+    const page  = Math.max(1, parseInt(req.query.page ?? '1', 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit ?? '20', 10) || 20));
+
+    const filter = { user: req.user.id };
+
+    // Filtri opzionali
+    if (req.query.mood) {
+      const m = coerceMood(req.query.mood, NaN);
+      if (Number.isFinite(m)) filter.mood = m;
+    }
+    if (req.query.hasEmotions === 'true') {
+      filter.emotions = { $exists: true, $ne: [] };
+    }
+    const createdAt = {};
+    if (req.query.from) {
+      const d = new Date(req.query.from);
+      if (!isNaN(d)) createdAt.$gte = d;
+    }
+    if (req.query.to) {
+      const d = new Date(req.query.to);
+      if (!isNaN(d)) createdAt.$lte = d;
+    }
+    if (Object.keys(createdAt).length) filter.createdAt = createdAt;
 
     const [items, total] = await Promise.all([
-      DiaryEntry.find({ user: req.user.id })
+      DiaryEntry.find(filter)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      DiaryEntry.countDocuments({ user: req.user.id })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      DiaryEntry.countDocuments(filter)
     ]);
 
     return res.json({
-      items,
       page,
       limit,
       total,
-      pages: Math.ceil(total / limit)
+      items
     });
   } catch (err) {
     console.error('Errore lettura diario:', err);
@@ -58,57 +110,67 @@ exports.getMyDiaryEntries = async (req, res) => {
   }
 };
 
-// PATCH /api/diary/:entryId
+/**
+ * PATCH /api/diary/:entryId
+ * Aggiornamento parziale: content, mood, emotions, shared
+ */
 exports.updateDiaryEntry = async (req, res) => {
   try {
     const { entryId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(entryId)) {
-      return res.status(400).json({ message: 'ID entry non valido' });
+    if (!isValidObjectId(entryId)) {
+      return res.status(400).json({ message: 'ID non valido' });
     }
 
     const patch = {};
-    // content (opzionale)
-    if (req.body?.content !== undefined) {
-      const raw = (req.body.content ?? '').toString();
-      const content = raw.trim();
-      if (!content) {
-        return res.status(400).json({ message: 'Il contenuto è obbligatorio' });
-      }
+    if ('content' in req.body) {
+      const content = normalizeContent(req.body.content);
       if (content.length > 5000) {
         return res.status(400).json({ message: 'Il contenuto supera i 5000 caratteri' });
       }
       patch.content = content;
     }
-
-    // shared (opzionale)
-    if (req.body?.shared !== undefined) {
+    if ('mood' in req.body) {
+      const m = coerceMood(req.body.mood, NaN);
+      if (!Number.isFinite(m)) {
+        return res.status(400).json({ message: 'Mood non valido (1..5)' });
+      }
+      patch.mood = m;
+    }
+    if ('emotions' in req.body) {
+      patch.emotions = normalizeEmotions(req.body.emotions);
+    }
+    if ('shared' in req.body) {
       patch.shared = !!req.body.shared;
     }
 
-    if (Object.keys(patch).length === 0) {
-      return res.status(400).json({ message: 'Nessun campo da aggiornare' });
-    }
-
-    const entry = await DiaryEntry.findOneAndUpdate(
-      { _id: entryId, user: req.user.id }, // ownership check
+    const updated = await DiaryEntry.findOneAndUpdate(
+      { _id: entryId, user: req.user.id },
       { $set: patch },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
-    if (!entry) return res.status(404).json({ message: 'Entry non trovata' });
-    return res.json(entry);
+    if (!updated) {
+      return res.status(404).json({ message: 'Entry non trovata' });
+    }
+    return res.json(updated);
   } catch (err) {
     console.error('Errore aggiornamento diario:', err);
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message });
+    }
     return res.status(500).json({ message: 'Errore interno' });
   }
 };
 
-// DELETE /api/diary/:entryId
+/**
+ * (Opzionale) DELETE /api/diary/:entryId
+ * Abilitare la rotta se necessario.
+ */
 exports.deleteDiaryEntry = async (req, res) => {
   try {
     const { entryId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(entryId)) {
-      return res.status(400).json({ message: 'ID entry non valido' });
+    if (!isValidObjectId(entryId)) {
+      return res.status(400).json({ message: 'ID non valido' });
     }
 
     const deleted = await DiaryEntry.findOneAndDelete({

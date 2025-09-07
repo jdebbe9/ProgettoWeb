@@ -14,6 +14,8 @@ router.post('/', wrapAsync(diaryController.createDiaryEntry));
 // Lista le mie entry (supporta ?page=&limit=)
 router.get('/', wrapAsync(diaryController.getMyDiaryEntries));
 
+router.delete('/:entryId', wrapAsync(diaryController.deleteDiaryEntry));
+
 // Aggiorna parzialmente una entry (contenuto)
 router.patch('/:entryId', wrapAsync(diaryController.updateDiaryEntry));
 
@@ -21,4 +23,3 @@ router.patch('/:entryId', wrapAsync(diaryController.updateDiaryEntry));
 // router.delete('/:entryId', wrapAsync(diaryController.deleteDiaryEntry));
 
 module.exports = router;
-
