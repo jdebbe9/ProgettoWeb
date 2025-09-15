@@ -1,43 +1,149 @@
 // frontend/src/pages/therapist/TherapistDashboard.jsx
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  Alert, Box, Button, Chip, Divider, Grid, Link, Paper, Stack, Typography, CircularProgress, Dialog, DialogTitle, DialogContent
+  Alert, Box, Button, Divider, Paper, Stack,
+  Typography, CircularProgress, TextField, IconButton,
+  Select, MenuItem, FormControl, InputLabel, LinearProgress, Chip
 } from '@mui/material';
-import EventIcon from '@mui/icons-material/Event';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import PeopleIcon from '@mui/icons-material/People';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { Link as RouterLink } from 'react-router-dom';
+
 import { useAuth } from '../../context/AuthContext';
 import { listAppointments } from '../../api/appointments';
-import { getAllPatients, getPatientDetails } from '../../api/therapists';
+import { getAllPatients } from '../../api/therapists';
 import { connectSocket } from '../../realtime/socket';
 
-function startOfDay(d) {
-  const x = new Date(d);
-  x.setHours(0,0,0,0);
-  return x;
-}
-function endOfDay(d) {
-  const x = new Date(d);
-  x.setHours(23,59,59,999);
-  return x;
-}
-function inRange(date, a, b) {
-  const t = new Date(date).getTime();
-  return t >= a.getTime() && t <= b.getTime();
-}
-function formatDT(d) {
-  try { return new Date(d).toLocaleString('it-IT'); } catch { return '—'; }
-}
-function formatD(d) {
-  try { return new Date(d).toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'2-digit' }); } catch { return '—'; }
-}
+/* -------------------- helpers -------------------- */
+const ACCEPTED = new Set(['accepted', 'rescheduled']);
+const NEGATIVE = new Set(['cancelled', 'rejected']);
 
+/** === UI TUNING (modifica qui per personalizzare) === */
+const LAYOUT = {
+  // KPI
+  kpiIconBox: 44,
+  kpiIconSize: 22,
+  kpiMinHeight: 120,
+
+  // Attività recente
+  activity: {
+    maxVisible: 3,       // dopo 3 eventi scorre
+    rowApproxHeight: 68, // evento compatto ma leggibile
+    listGap: 1,
+    itemPadding: 0.75,   // se presente nel sx degli item
+  },
+
+  // Promemoria (altezza “pari” ad Attività ~320px)
+  reminders: {
+    buttonSize: 'small',
+    fieldSize: 'medium',
+    inputMinRows: 2.1,
+    panelMinHeight: 285,
+    panelMaxHeight: 285, // fisso -> combacia visivamente con Attività
+  },
+};
+
+/* ==================================================== */
+
+function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function endOfDay(d) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
+function inRange(date, a, b) { const t = new Date(date).getTime(); return t >= a.getTime() && t <= b.getTime(); }
+function fmtDT(d) { try { return new Date(d).toLocaleString('it-IT'); } catch { return '—'; } }
+function fullName(p) { return `${p?.name || ''} ${p?.surname || ''}`.trim(); }
+
+/* ======================= LOGICA STATISTICHE (hook) ======================= */
+function useStatistics(appointments, patients) {
+  const [statPeriod, setStatPeriod] = useState('30'); // '7' | '30' | '90' | 'ytd'
+
+  const { from, to } = useMemo(() => {
+    const now = new Date();
+    const end = endOfDay(now);
+    if (statPeriod === '7' || statPeriod === '30' || statPeriod === '90') {
+      const days = parseInt(statPeriod, 10);
+      const start = startOfDay(new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000));
+      return { from: start, to: end };
+    }
+    // YTD
+    const yStart = startOfDay(new Date(now.getFullYear(), 0, 1));
+    return { from: yStart, to: end };
+  }, [statPeriod]);
+
+  const inPeriodApps = useMemo(
+    () => (appointments || []).filter(a => inRange(a.date, from, to)),
+    [appointments, from, to]
+  );
+
+  const stats = useMemo(() => {
+    const total = inPeriodApps.length;
+    const conf = inPeriodApps.filter(a => ACCEPTED.has(a.status)).length;
+    const neg  = inPeriodApps.filter(a => NEGATIVE.has(a.status)).length;
+
+    const newPts = (patients || []).filter(p => inRange(p.createdAt, from, to)).length;
+
+    // Questionari basati sui pazienti creati nel periodo
+    const periodPatients = (patients || []).filter(p => inRange(p.createdAt, from, to));
+    const qDone = periodPatients.filter(p => !!p.questionnaireDone).length;
+    const qTot  = periodPatients.length;
+
+    return {
+      appsTotal: total,
+      confirmRate: total ? Math.round((conf / total) * 100) : 0,
+      cancelRate: total ? Math.round((neg  / total) * 100) : 0,
+      newPatients: newPts,
+      qDone, qTotal: qTot, qPct: qTot ? Math.round((qDone / qTot) * 100) : 0,
+      missingQ: periodPatients.filter(p => !p.questionnaireDone),
+    };
+  }, [inPeriodApps, patients, from, to]);
+
+  // Trend settimanale (bucket lun-dom dentro il periodo)
+  const trendWeekly = useMemo(() => {
+    const buckets = [];
+    const start = new Date(from);
+    const end   = new Date(to);
+
+    // allinea start al lunedì
+    const day = start.getDay(); // 0=dom
+    const offsetToMon = (day === 0 ? -6 : 1 - day);
+    start.setDate(start.getDate() + offsetToMon);
+    start.setHours(0,0,0,0);
+
+    // settimane fino a "to"
+    let cur = new Date(start);
+    while (cur <= end) {
+      const weekStart = new Date(cur);
+      const weekEnd   = endOfDay(new Date(weekStart.getTime() + 6*24*60*60*1000));
+      buckets.push({ a: weekStart, b: weekEnd });
+      cur = new Date(weekEnd.getTime() + 1);
+    }
+
+    const series = buckets.map(({a,b}) => {
+      const count = inPeriodApps.filter(x => ACCEPTED.has(x.status) && inRange(x.date, a, b)).length;
+      const label = `${a.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' })}–${b.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' })}`;
+      return { label, count };
+    });
+
+    const max = Math.max(1, ...series.map(s => s.count));
+    return series.map(s => ({ ...s, pct: Math.round((s.count / max) * 100) }));
+  }, [inPeriodApps, from, to]);
+
+  // (lasciamo qui eventuali altri calcoli, anche se non usati)
+  const slowRequests = useMemo(() => {
+    const now = Date.now();
+    return (appointments || [])
+      .filter(a => a.status === 'pending')
+      .filter(a => now - new Date(a.createdAt || a.date).getTime() > 48*60*60*1000);
+  }, [appointments]);
+
+  return { statPeriod, setStatPeriod, stats, trendWeekly, slowRequests };
+}
+/* ======================================================================= */
+
+/* -------------------- component -------------------- */
 export default function TherapistDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const isTherapist = user?.role === 'therapist';
 
   const [loading, setLoading] = useState(true);
@@ -46,20 +152,16 @@ export default function TherapistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients]         = useState([]);
 
-  // Modal "scheda paziente" leggera
-  const [openPatient, setOpenPatient] = useState(null);
-  const [patientDetails, setPatientDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  // Promemoria (localStorage per terapeuta corrente)
+  const storageKey = `pcare:reminders:${user?._id || 'me'}`;
+  const [notes, setNotes]     = useState([]);
+  const [newNote, setNewNote] = useState('');
 
   const loadData = useCallback(async () => {
     if (!isTherapist) { setLoading(false); return; }
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const [apps, patsRes] = await Promise.all([
-        listAppointments(),
-        getAllPatients()
-      ]);
+      const [apps, patsRes] = await Promise.all([ listAppointments(), getAllPatients() ]);
       setAppointments(Array.isArray(apps) ? apps : []);
       setPatients(Array.isArray(patsRes?.items) ? patsRes.items : []);
     } catch (e) {
@@ -69,304 +171,342 @@ export default function TherapistDashboard() {
     }
   }, [isTherapist]);
 
-  // realtime: aggiorna KPI/listini alla creazione/aggiornamento
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // realtime: refresh leggero
   useEffect(() => {
     if (!isTherapist) return;
     const s = connectSocket();
     const reload = () => loadData();
     s.on('appointment:created', reload);
     s.on('appointment:updated', reload);
-    s.on('appointment:removed', reload);
     s.on('appointment:deleted', reload);
+    s.on('appointment:removed', reload);
     return () => {
       s.off('appointment:created', reload);
       s.off('appointment:updated', reload);
-      s.off('appointment:removed', reload);
       s.off('appointment:deleted', reload);
+      s.off('appointment:removed', reload);
     };
   }, [isTherapist, loadData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Promemoria: load/save
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      setNotes(raw ? JSON.parse(raw) : []);
+    } catch {
+      setNotes([]);
+    }
+  }, [storageKey]);
 
-  // ---- KPI derivati ----
-  const now = new Date();
-  const todayA = startOfDay(now);
-  const todayB = endOfDay(now);
-  const in7dA = startOfDay(now);
-  const in7dB = endOfDay(new Date(now.getTime() + 6*24*60*60*1000)); // oggi + 6 -> 7 giorni
+  const saveNotes = (arr) => {
+    setNotes(arr);
+    try { localStorage.setItem(storageKey, JSON.stringify(arr)); } catch {/* */}
+  };
+  const addNote = () => {
+    const t = (newNote || '').trim();
+    if (!t) return;
+    const n = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`, text: t, createdAt: new Date().toISOString() };
+    saveNotes([n, ...notes]); setNewNote('');
+  };
+  const delNote = (id) => saveNotes(notes.filter(n => n.id !== id));
 
-  const acceptedStatuses = new Set(['accepted', 'rescheduled']);
+  /* --------- derivazioni --------- */
+  const todayCount = useMemo(() => {
+    const now = new Date();
+    const a = startOfDay(now), b = endOfDay(now);
+    return appointments.filter(x => ACCEPTED.has(x.status) && inRange(x.date, a, b)).length;
+  }, [appointments]);
+
   const pendingCount = useMemo(
     () => appointments.filter(a => a.status === 'pending').length,
     [appointments]
   );
-  const todayCount = useMemo(
-    () => appointments.filter(a => acceptedStatuses.has(a.status) && inRange(a.date, todayA, todayB)).length,
-    [appointments]
-  );
+
   const activePatients90d = useMemo(() => {
-    const since = new Date(now.getTime() - 90*24*60*60*1000);
+    const since = new Date(Date.now() - 90*24*60*60*1000);
     const ids = new Set(
-      appointments
-        .filter(a => acceptedStatuses.has(a.status) && new Date(a.date) >= since)
-        .map(a => a.patient?._id || a.patient)
+      appointments.filter(a => ACCEPTED.has(a.status) && new Date(a.date) >= since)
+                  .map(a => a.patient?._id || a.patient)
     );
     ids.delete(undefined);
     return ids.size;
   }, [appointments]);
 
-  const recentPatients = useMemo(() => {
-    const map = new Map();
-    appointments
-      .filter(a => acceptedStatuses.has(a.status))
-      .sort((a,b) => new Date(b.date) - new Date(a.date))
-      .forEach(a => {
-        const p = a.patient;
-        const id = p?._id || p;
-        if (!map.has(id) && p) map.set(id, p);
-      });
-    return Array.from(map.values()).slice(0,5);
-  }, [appointments]);
-
-  // percentuale questionario completato fra i pazienti creati negli ultimi 30 gg
   const q30 = useMemo(() => {
-    const since = new Date(now.getTime() - 30*24*60*60*1000);
+    const since = new Date(Date.now() - 30*24*60*60*1000);
     const recent = patients.filter(p => new Date(p.createdAt) >= since);
     const done = recent.filter(p => !!p.questionnaireDone);
-    const pct = recent.length ? Math.round((done.length / recent.length) * 100) : 0;
-    return { pct, done: done.length, total: recent.length };
+    return { done: done.length, total: recent.length, pct: recent.length ? Math.round((done.length / recent.length) * 100) : 0 };
   }, [patients]);
 
-  const upcoming7 = useMemo(() => {
-    return appointments
-      .filter(a => acceptedStatuses.has(a.status) && inRange(a.date, in7dA, in7dB))
-      .sort((a,b) => new Date(a.date) - new Date(b.date))
-      .slice(0, 8);
+  const activityList = useMemo(() => {
+    return (appointments || [])
+      .filter(a => a.status !== 'pending')
+      .map(a => ({
+        when: new Date(a.updatedAt || a.date || 0).getTime(),
+        title:
+          a.status === 'accepted' ? 'Appuntamento confermato'
+          : a.status === 'rescheduled' ? 'Appuntamento riprogrammato'
+          : a.status === 'rejected' ? 'Appuntamento rifiutato'
+          : a.status === 'cancelled' ? 'Appuntamento annullato'
+          : `Stato: ${a.status}`,
+        subtitle: `${fullName(a.patient)} — ${fmtDT(a.date)}`
+      }))
+      .sort((x,y)=> y.when - x.when);
   }, [appointments]);
 
-  // Banners
-  const banners = useMemo(() => {
-    const items = [];
-    if (pendingCount > 0) {
-      items.push({
-        key: 'pending',
-        title: `Hai ${pendingCount} richieste di appuntamento in attesa`,
-        actionLabel: 'Rivedi nell’Agenda',
-        onClick: () => navigate('/therapist/schedule'),
-      });
-    }
-    if (upcoming7.length === 0) {
-      items.push({
-        key: 'availability',
-        title: 'Non hai appuntamenti nei prossimi 7 giorni',
-        actionLabel: 'Aggiungi disponibilità',
-        onClick: () => navigate('/therapist/schedule'),
-      });
-    }
-    return items;
-  }, [pendingCount, upcoming7, navigate]);
+  /* ---- STATISTICHE: stato/calcoli ---- */
+  // 👉 tolgo dallo use le parti che non useremo in UI
+  const { statPeriod, setStatPeriod, stats, trendWeekly } =
+    useStatistics(appointments, patients);
 
-  // Apertura scheda paziente (modal leggera)
-  const openPatientCard = async (p) => {
-    setOpenPatient(p);
-    setPatientDetails(null);
-    setLoadingDetails(true);
-    try {
-      const data = await getPatientDetails(p._id);
-      setPatientDetails(data);
-    } catch  {
-      // noop
-    } finally {
-      setLoadingDetails(false);
-    }
+  /* -------------------- UI -------------------- */
+  // Card KPI (icone e testo allineati, supporta Icon o icon)
+  const StatCard = ({ Icon, icon, title, value, sub, to }) => {
+    const iconNode = Icon ? <Icon sx={{ fontSize: LAYOUT.kpiIconSize }} /> : icon || null;
+    return (
+      <Paper variant="outlined" sx={{ p: 2, height: '100%', minHeight: LAYOUT.kpiMinHeight }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: `${LAYOUT.kpiIconBox}px 1fr auto`, alignItems: 'center', columnGap: 2 }}>
+          <Box sx={{
+            width: LAYOUT.kpiIconBox, height: LAYOUT.kpiIconBox, borderRadius: 2,
+            bgcolor: 'primary.light', color: 'primary.contrastText', display: 'grid', placeItems: 'center'
+          }} aria-hidden>
+            {iconNode}
+          </Box>
+
+          {/* Blocco testuale centrato verticalmente */}
+          <Box sx={{ minWidth: 0, display: 'grid', alignContent: 'center', rowGap: 0.25 }}>
+            <Typography variant="overline" color="text.secondary" noWrap>{title}</Typography>
+            <Typography variant="h5" sx={{ lineHeight: 1.2 }}>{value}</Typography>
+            {sub && <Typography variant="caption" color="text.secondary">{sub}</Typography>}
+          </Box>
+
+          {to && <Button size="small" component={RouterLink} to={to} sx={{ alignSelf: 'start' }}>Apri</Button>}
+        </Box>
+      </Paper>
+    );
   };
 
+  // Altezza massima scroll Attività = 3 eventi compatti
+  const activityMaxHeight = useMemo(() => {
+    const { maxVisible, rowApproxHeight, listGap } = LAYOUT.activity;
+    return maxVisible * rowApproxHeight + (maxVisible - 1) * listGap;
+  }, []);
+
+  /* -------------------- RENDER -------------------- */
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>Dashboard Terapeuta</Typography>
+      <Typography variant="h5" sx={{ mb: 1 }}>Dashboard</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {loading ? (
-        <CircularProgress />
-      ) : (
+      {loading ? <CircularProgress /> : (
         <>
-          {/* KPI */}
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <EventIcon />
-                  <Typography variant="subtitle2">Appuntamenti oggi</Typography>
-                </Stack>
-                <Typography variant="h4" sx={{ mt: 1 }}>{todayCount}</Typography>
-                <Link component={RouterLink} to="/therapist/schedule" underline="hover">
-                  Vai all’Agenda
-                </Link>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <HourglassEmptyIcon />
-                  <Typography variant="subtitle2">Richieste in attesa</Typography>
-                </Stack>
-                <Typography variant="h4" sx={{ mt: 1 }}>{pendingCount}</Typography>
-                <Link component={RouterLink} to="/therapist/schedule" underline="hover">
-                  Rivedi richieste
-                </Link>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <PeopleIcon />
-                  <Typography variant="subtitle2">Pazienti attivi (90 gg)</Typography>
-                </Stack>
-                <Typography variant="h4" sx={{ mt: 1 }}>{activePatients90d}</Typography>
-                <Typography variant="body2" color="text.secondary">Visite confermate</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <AssignmentTurnedInIcon />
-                  <Typography variant="subtitle2">Questionari (ultimi 30 gg)</Typography>
-                </Stack>
-                <Typography variant="h4" sx={{ mt: 1 }}>{q30.pct}%</Typography>
-                <Typography variant="body2" color="text.secondary">{q30.done}/{q30.total} completati</Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+          {/* KPI: due per riga su >= sm */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, // sempre 2↔2 per riga
+              gap: 2,
+              alignItems: 'stretch',
+              mb: 2,
+            }}
+          >
+            <StatCard Icon={EventAvailableIcon} title="Appuntamenti di oggi" value={todayCount} to="/therapist/schedule" />
+            <StatCard Icon={HourglassEmptyIcon} title="Richieste in attesa" value={pendingCount} to="/therapist/schedule/requests" />
+            <StatCard Icon={PeopleIcon} title="Pazienti attivi" value={activePatients90d} to="/therapist/patients" />
+            <StatCard Icon={AssignmentTurnedInIcon} title="Questionari (ultimi 30 giorni)" value={`${q30.pct}% completati`} to="/therapist/patients" />
+          </Box>
 
-          {/* Centro azioni */}
-          <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
-              <Button variant="contained" endIcon={<ArrowForwardIcon />} onClick={() => navigate('/therapist/schedule')}>
-                Rivedi richieste in attesa
-              </Button>
-              <Button variant="outlined" onClick={() => navigate('/therapist/schedule')}>
-                Aggiungi disponibilità
-              </Button>
-            </Stack>
-          </Paper>
+          {/* Layout principale: 2 colonne uguali */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr' }, gap: 2, alignItems: 'start' }}>
+            {/* Colonna sinistra: Attività recente */}
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle1">Attività recente</Typography>
+              <Divider sx={{ my: 1 }} />
 
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            {/* Prossimi 7 giorni */}
-            <Grid item xs={12} md={7}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>Prossimi 7 giorni</Typography>
-                {upcoming7.length === 0 ? (
-                  <Typography color="text.secondary">Nessun appuntamento programmato.</Typography>
-                ) : (
+              {activityList.length === 0 ? (
+                <Typography color="text.secondary">Nessuna attività recente.</Typography>
+              ) : (
+                <Box
+                  sx={{
+                    maxHeight: activityMaxHeight,
+                    overflowY: 'auto',
+                    pr: 1,
+                    // Scrollbar chiara, sottile
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: 'rgba(0,0,0,0.18)',
+                      borderRadius: 8,
+                    },
+                    '&:hover::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.28)' },
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'rgba(0,0,0,0.18) transparent',
+                  }}
+                >
+                  <Stack spacing={LAYOUT.activity.listGap}>
+                    {activityList.map((ev, idx) => (
+                      <Paper key={idx} variant="outlined" sx={{ p: LAYOUT.activity.itemPadding }}>
+                        <Typography fontWeight="bold">{ev.title}</Typography>
+                        <Typography variant="body2" color="text.secondary">{ev.subtitle}</Typography>
+                        <Typography variant="caption" color="text.secondary">{fmtDT(ev.when)}</Typography>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Paper>
+
+            {/* Colonna destra: Promemoria */}
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                height: '100%',
+                minHeight: LAYOUT.reminders.panelMinHeight || undefined,
+                maxHeight: LAYOUT.reminders.panelMaxHeight || undefined,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <Typography variant="subtitle1">Promemoria</Typography>
+              <Divider sx={{ my: 1 }} />
+              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                <TextField
+                  value={newNote}
+                  onChange={(e)=>setNewNote(e.target.value)}
+                  placeholder="Aggiungi una nota"
+                  size={LAYOUT.reminders.fieldSize}
+                  fullWidth
+                  multiline
+                  minRows={LAYOUT.reminders.inputMinRows}
+                />
+                {/* Bottone identico a "APRI" */}
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={addNote}
+                  sx={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}
+                >
+                  AGGIUNGI
+                </Button>
+              </Stack>
+
+              {notes.length === 0 ? (
+                <Typography color="text.secondary">Nessun promemoria salvato.</Typography>
+              ) : (
+                <Box
+                  sx={{
+                    overflowY: 'auto',
+                    // Scrollbar identica ad "Attività recente"
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: 'rgba(0,0,0,0.18)',
+                      borderRadius: 8,
+                    },
+                    '&:hover::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.28)' },
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'rgba(0,0,0,0.18) transparent',
+                  }}
+                >
                   <Stack spacing={1}>
-                    {upcoming7.map(a => (
-                      <Paper key={a._id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    {notes.map(n => (
+                      <Paper key={n.id} variant="outlined" sx={{ p: 1 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <div>
-                            <Typography fontWeight="bold">{formatDT(a.date)}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {a.patient?.name} {a.patient?.surname} — {a.patient?.email}
+                            <Typography sx={{ whiteSpace:'pre-wrap' }}>{n.text}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {fmtDT(n.createdAt)}
                             </Typography>
                           </div>
-                          <Chip size="small" label={a.status} />
+                          <IconButton size="small" onClick={()=>delNote(n.id)} aria-label="Elimina">
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
                         </Stack>
                       </Paper>
                     ))}
                   </Stack>
-                )}
-              </Paper>
-            </Grid>
+                </Box>
+              )}
+            </Paper>
+          </Box>
 
-            {/* Pazienti recenti */}
-            <Grid item xs={12} md={5}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>Pazienti recenti</Typography>
-                {recentPatients.length === 0 ? (
-                  <Typography color="text.secondary">Nessun paziente recente.</Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    {recentPatients.map(p => (
-                      <Paper key={p._id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <div>
-                            <Typography fontWeight="bold">{p.name} {p.surname}</Typography>
-                            <Typography variant="body2" color="text.secondary">{p.email}</Typography>
-                          </div>
-                          <Button size="small" onClick={() => openPatientCard(p)}>Apri scheda</Button>
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
+          {/* ======================= SEZIONE STATISTICHE ======================= */}
+          <Box sx={{ mt: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" spacing={1}>
+                <Typography variant="h6">Statistiche</Typography>
+                <FormControl size="small" sx={{ minWidth: 160 }}>
+                  <InputLabel id="stat-period-label">Periodo</InputLabel>
+                  <Select
+                    labelId="stat-period-label"
+                    label="Periodo"
+                    value={statPeriod}
+                    onChange={(e)=>setStatPeriod(e.target.value)}
+                  >
+                    <MenuItem value="7">Ultimi 7 giorni</MenuItem>
+                    <MenuItem value="30">Ultimi 30 giorni</MenuItem>
+                    <MenuItem value="90">Ultimi 90 giorni</MenuItem>
+                    <MenuItem value="ytd">Anno in corso</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
 
-          {/* Banners */}
-          {banners.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Grid container spacing={2}>
-                {banners.map(b => (
-                  <Grid item xs={12} md={6} key={b.key}>
-                    <Paper variant="outlined" sx={{ p: 2, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <Typography>{b.title}</Typography>
-                      <Button variant="text" onClick={b.onClick}>{b.actionLabel}</Button>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          )}
+              {/* KPI Statistiche */}
+              <Box
+                sx={{
+                  mt: 2,
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
+                  gap: 1.5,
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">Appuntamenti</Typography>
+                  <Typography variant="h6">{stats.appsTotal}</Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">Tasso conferma</Typography>
+                  <Typography variant="h6">{stats.confirmRate}%</Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">Cancellati / No-show</Typography>
+                  <Typography variant="h6">{stats.cancelRate}%</Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">Nuovi pazienti</Typography>
+                  <Typography variant="h6">{stats.newPatients}</Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">Questionari</Typography>
+                  <Typography variant="h6">{stats.qDone}/{stats.qTotal} <Chip size="small" label={`${stats.qPct}%`} sx={{ ml: .5 }} /></Typography>
+                </Paper>
+              </Box>
+
+              {/* Trend settimanale (barre) */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: .5 }}>Trend settimanale (appuntamenti confermati)</Typography>
+                <Stack spacing={0.75}>
+                  {trendWeekly.map((w, i) => (
+                    <Box key={i}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: .25 }}>
+                        <Typography variant="caption" color="text.secondary">{w.label}</Typography>
+                        <Typography variant="caption">{w.count}</Typography>
+                      </Stack>
+                      <LinearProgress variant="determinate" value={w.pct} />
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            </Paper>
+          </Box>
+          {/* ===================== /SEZIONE STATISTICHE ===================== */}
         </>
       )}
-
-      {/* Modal scheda paziente (lettura veloce) */}
-      <Dialog open={!!openPatient} onClose={() => setOpenPatient(null)} fullWidth maxWidth="md">
-        <DialogTitle>Scheda paziente — {openPatient ? `${openPatient.name} ${openPatient.surname}` : ''}</DialogTitle>
-        <DialogContent dividers>
-          {loadingDetails && <CircularProgress />}
-          {!loadingDetails && !patientDetails && <Alert severity="error">Impossibile caricare i dettagli.</Alert>}
-          {!loadingDetails && patientDetails && (
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="subtitle2">Anagrafica</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Email: {patientDetails.user?.email} — Nato/a: {patientDetails.user?.birthDate ? formatD(patientDetails.user.birthDate) : '—'}
-                </Typography>
-              </Box>
-              <Divider />
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Ultime voci di diario</Typography>
-                {patientDetails.diary?.length ? (
-                  <Stack spacing={1}>
-                    {patientDetails.diary.slice(0,3).map(e => (
-                      <Paper key={e._id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">{formatDT(e.createdAt)}</Typography>
-                        <Typography sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{e.content}</Typography>
-                      </Paper>
-                    ))}
-                  </Stack>
-                ) : <Typography color="text.secondary">Nessuna voce presente.</Typography>}
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Questionario</Typography>
-                {patientDetails.questionnaire ? (
-                  <Typography variant="body2" color="text.secondary">Compilato il {formatDT(patientDetails.questionnaire.createdAt)}</Typography>
-                ) : (
-                  <Typography color="text.secondary">Non ancora compilato.</Typography>
-                )}
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-      </Dialog>
     </Box>
   );
 }
-
-
-
-
-
-

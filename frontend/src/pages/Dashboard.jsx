@@ -91,26 +91,8 @@ export default function Dashboard() {
             Ciao {user?.name ? `${user.name}` : 'e benvenuto/a'} 
           </Typography>
           <Typography color="text.secondary">
-            Questo è il tuo spazio riservato: semplice, discreto e professionale. Qui trovi tutto il necessario per seguire il percorso con continuità.
+            Questo è il tuo spazio riservato: semplice, discreto e professionale dove troverai il necessario per seguire il percorso con continuità.
           </Typography>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
-            <Button startIcon={<EventAvailableIcon />} component={RouterLink} to="/appointments" variant="contained">
-              Appuntamenti
-            </Button>
-            <Button startIcon={<EditNoteIcon />} component={RouterLink} to="/diary" variant="outlined">
-              Diario
-            </Button>
-            <Button startIcon={<MenuBookIcon />} component={RouterLink} to="/materials" variant="outlined">
-              Materiali
-            </Button>
-            <Button startIcon={<CheckCircleIcon />} component={RouterLink} to="/goals" variant="outlined">
-              Obiettivi
-            </Button>
-            <Button startIcon={<HealthAndSafetyIcon />} component={RouterLink} to="/safety-plan" variant="outlined">
-              Sicurezza
-            </Button>
-          </Stack>
         </Stack>
       </Paper>
 
@@ -133,44 +115,6 @@ export default function Dashboard() {
           </Grid>
         ))}
       </Grid>
-
-      {/* ETICA & PRIVACY */}
-      <Typography variant="h6" sx={{ mb: 1.5 }}>Etica & privacy</Typography>
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 4 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
-          <SecurityIcon />
-          <Stack spacing={0.5}>
-            <Typography fontWeight={600}>I tuoi dati, al sicuro.</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Le informazioni sono trattate con riservatezza e nel rispetto della normativa. Puoi decidere cosa condividere con il terapeuta (es. voci del diario private).
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-              <Chip size="small" label="Trasparenza" />
-              <Chip size="small" label="Consenso informato" />
-              <Chip size="small" label="Controllo dei dati" />
-            </Stack>
-          </Stack>
-          <Box sx={{ flexGrow: 1 }} />
-          <Button component={RouterLink} to="/privacy" size="small">Privacy</Button>
-        </Stack>
-      </Paper>
-
-      {/* EMERGENZE */}
-      <Typography variant="h6" sx={{ mb: 1.5 }}>In caso di emergenza</Typography>
-      <Alert severity="warning" icon={<HealthAndSafetyIcon />}>
-        Se ti senti in pericolo o stai vivendo un’urgenza, contatta subito i servizi di emergenza
-        (112/118) o rivolgiti al Pronto Soccorso più vicino. Questo sito non sostituisce i servizi di emergenza.
-      </Alert>
-
-      <Divider sx={{ my: 4 }} />
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} sx={{ color: 'text.secondary' }}>
-        <Typography variant="caption">© {new Date().getFullYear()} PsicoCare — Area paziente</Typography>
-        <Stack direction="row" spacing={2}>
-          <Button component={RouterLink} to="/privacy" size="small">Privacy</Button>
-          <Button component={RouterLink} to="/cookie" size="small">Cookie</Button>
-          <Button component={RouterLink} to="/note-legali" size="small">Note legali</Button>
-        </Stack>
-      </Stack>
     </Box>
   );
 }

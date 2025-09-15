@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { createAppointment, listAppointments } from '../api/appointments';
 import { getSlotsAvailability } from '../api/slots';
 import { connectSocket } from '../realtime/socket';
-import { me as fetchMe } from '../api/auth'; // ⬅️ per verificare completezza profilo
+import { getMe as fetchMe } from '../api/user'; // ✅ usa /api/user/me
 
 const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta';
 const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h slot, lun–ven
@@ -36,6 +36,11 @@ function statusItLower(s) {
   if (x === 'accepted') return 'confermato';
   if (x === 'pending' || x === 'rescheduled') return 'in attesa';
   return x;
+}
+function computeProfileCompleteLocal(obj) {
+  const has = v => typeof v === 'string' && v.trim().length > 0;
+  return has(obj?.name) && has(obj?.surname) && has(obj?.email) &&
+         has(obj?.address) && has(obj?.city) && has(obj?.cap) && has(obj?.phone);
 }
 
 // griglia settimanale
@@ -111,7 +116,20 @@ export default function Appointments() {
     }
   }, [weekDays]);
 
-  // ⬇️ carica profilo per controllare completezza
+  // ✅ reagisci SUBITO a cambi dell'AuthContext (post-salvataggio profilo)
+  useEffect(() => {
+    if (!user) return;
+    if (user.profileComplete === true) { setProfileOk(true); return; }
+
+    // se non esposto, prova a calcolare localmente dai campi in context
+    const localOk = computeProfileCompleteLocal({
+      name: user.name, surname: user.surname, email: user.email,
+      address: user.address, city: user.city, cap: user.cap, phone: user.phone,
+    });
+    setProfileOk(localOk);
+  }, [user]);
+
+  // ⬇️ ulteriore conferma dal server (non blocca se fallisce)
   useEffect(() => {
     let on = true;
     (async () => {
@@ -120,16 +138,14 @@ export default function Appointments() {
         if (!on) return;
         const ok =
           Boolean(data?.profileComplete) ||
-          ['name','surname','email','address','city','cap','phone']
-            .every(k => String(data?.[k] ?? '').trim().length > 0);
+          computeProfileCompleteLocal(data);
         setProfileOk(ok);
       } catch {
-        // se fallisce la lettura profilo, non blocchiamo: lasciamo profileOk=true
-        setProfileOk(true);
+        // se fallisce la lettura profilo, non blocchiamo: lasciamo profileOk come già calcolato
       }
     })();
     return () => { on = false; };
-  }, [user]);
+  }, [user]); // rilegge quando cambia l'utente
 
   // first loads
   useEffect(() => { if (user) fetchAppointments(); }, [user, fetchAppointments]);
@@ -295,7 +311,7 @@ export default function Appointments() {
             </Button>
           }
         >
-          <strong>Completa il tuo profilo</strong> per poter prenotare appuntamenti.
+          <strong>Completa il tuo profilo</strong> per poter prenotare il tuo appuntamento.
         </Alert>
       )}
 
@@ -411,7 +427,7 @@ export default function Appointments() {
         </Paper>
       )}
 
-      {/* Dialog: STORICO (appuntamenti scaduti, confermati nel passato) */}
+      {/* Dialog: STORICO */}
       <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Storico appuntamenti</DialogTitle>
         <DialogContent dividers>
@@ -526,7 +542,7 @@ function PatientSlotRow({
         const confirmedThisDay = acceptedDays.has(dateStr); // per trasparenza
 
         const isBusy = !slot || slot.busy || isPast;
-        const isFree = slot && !slot.busy && !isPast && d >= tomorrow0 && !alreadyInDay;
+        const isFree = slot && !slot.busy && !isPast && d.getTime() >= tomorrow0.getTime() && !alreadyInDay;
 
         // stato visivo come terapeuta
         let stateSx;
@@ -595,11 +611,3 @@ function PatientSlotRow({
     </>
   );
 }
-
-
-
-
-
-
-
-

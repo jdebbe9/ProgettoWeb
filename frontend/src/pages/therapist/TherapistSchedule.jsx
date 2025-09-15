@@ -61,6 +61,20 @@ function statusToCell(stateRaw) {
   return 'free';
 }
 
+// Etichetta italiana per stato
+function statusToLabel(stateRaw) {
+  const s = String(stateRaw || '').toLowerCase();
+  switch (s) {
+    case 'accepted': return 'Accettato';
+    case 'pending': return 'In attesa';
+    case 'rescheduled': return 'Ripianificato';
+    case 'cancelled':
+    case 'canceled': return 'Annullato';
+    case 'rejected': return 'Rifiutato';
+    default: return '—';
+  }
+}
+
 export default function TherapistSchedule() {
   const { user } = useAuth();
   const isTherapist = user?.role === 'therapist';
@@ -216,6 +230,12 @@ export default function TherapistSchedule() {
     <Box className="container" sx={{ mt: 3, maxWidth: 1100 }}>
       <ScheduleTabs />
 
+      {/* Banner introduttivo */}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        <strong>Gestisci le prenotazioni dei pazienti. </strong> 
+        Naviga tra le settimane, visualizza gli appuntamenti, riprogramma su uno slot libero e apri la visita online quando disponibile.
+      </Alert>
+
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Tooltip title="Settimana precedente">
@@ -232,12 +252,7 @@ export default function TherapistSchedule() {
           </Typography>
         </Stack>
 
-        {/* Legenda */}
-        <Stack direction="row" spacing={1} alignItems="center">
-          <LegendDot sx={{ bgcolor: 'success.main' }} /> <Typography component="span" variant="body2">Accettato</Typography>
-          <LegendDot sx={{ bgcolor: 'warning.main' }} /> <Typography component="span" variant="body2">In attesa</Typography>
-          <LegendDot sx={{ bgcolor: 'action.disabledBackground' }} /> <Typography component="span" variant="body2">Libero</Typography>
-        </Stack>
+        {/* Legenda rimossa */}
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -409,7 +424,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
               minHeight: 56,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: cellState === 'free' ? 'center' : 'space-between',
               gap: 1,
               position: 'relative',
               ...stateSx,
@@ -421,7 +436,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
               <>
                 <Stack spacing={0.25} sx={{ overflow: 'hidden' }}>
                   <Typography variant="body2" component="span" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-                    {label} • {prettyStatus(appt.status)}
+                    {label} • {statusToLabel(appt.status)}
                   </Typography>
                   <Typography variant="caption" component="span" noWrap title={fullNameOrEmail(appt.patient)}>
                     {fullNameOrEmail(appt.patient)}
@@ -468,7 +483,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
                 )}
               </>
             ) : (
-              <Typography variant="body2" component="span" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" component="span" sx={{ opacity: 0.9, width: '100%', textAlign: 'center' }}>
                 {label} • Libero
               </Typography>
             )}
@@ -520,16 +535,4 @@ function ReschedRow({ hour, days, avail, onPick }) {
     </>
   );
 }
-
-function prettyStatus(statusRaw) {
-  const s = String(statusRaw || '').toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function LegendDot({ sx }) {
-  return <Box sx={{ width: 12, height: 12, borderRadius: '50%', ...sx }} />;
-}
-
-
-
 

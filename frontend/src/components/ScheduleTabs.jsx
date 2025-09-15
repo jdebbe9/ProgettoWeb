@@ -7,37 +7,30 @@ import { connectSocket } from '../realtime/socket';
 
 export default function ScheduleTabs() {
   const { pathname } = useLocation();
-  const value = pathname.startsWith('/therapist/schedule/requests')
-    ? 'requests'
-    : pathname.startsWith('/therapist/schedule/availability')
-    ? 'availability'
-    : 'calendar';
+  const value = pathname.startsWith('/therapist/schedule/requests') ? 'requests' : 'calendar';
 
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
     let mounted = true;
-
     const load = async () => {
       try {
         const apps = await listAppointments();
-        const n = (Array.isArray(apps) ? apps : []).filter(a => a.status === 'pending').length;
-        if (mounted) setPending(n);
-      } catch (e) {
-        if (import.meta?.env?.DEV) console.warn('[ScheduleTabs] load failed:', e);
+        if (!mounted) return;
+        const count = (apps || []).filter(a => a.status === 'pending').length;
+        setPending(count);
+      } catch {
+        setPending(0);
       }
     };
-
     load();
 
     const s = connectSocket();
     const reload = () => load();
-
     s.on('appointment:created', reload);
     s.on('appointment:updated', reload);
     s.on('appointment:removed', reload);
     s.on('appointment:deleted', reload);
-
     return () => {
       mounted = false;
       s.off('appointment:created', reload);
@@ -56,14 +49,29 @@ export default function ScheduleTabs() {
           component={RouterLink}
           to="/therapist/schedule/requests"
           label={
-            <Badge color="error" badgeContent={pending} invisible={pending === 0}>
+            <Badge
+              color="info"
+              badgeContent={pending}
+              invisible={pending === 0}
+              overlap="rectangular"
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+              sx={{
+                '& .MuiBadge-badge': {
+                  height: 6,
+                  minWidth: 6,
+                  fontSize: 0,
+                  lineHeight: '6px',
+                  px: 0.2,
+                  borderRadius: '6px',
+                  transform: 'translate(50%, -50%)', // mantiene l’allineamento in alto a destra
+                },
+              }}
+            >
               Richieste in attesa
             </Badge>
           }
         />
-        <Tab value="availability" label="Disponibilità" component={RouterLink} to="/therapist/schedule/availability" />
       </Tabs>
     </Paper>
   );
 }
-
