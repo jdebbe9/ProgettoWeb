@@ -93,7 +93,7 @@ export default function ScheduleRequests() {
     } finally { setBusyId(null); }
   };
 
-  // RIFIUTO ISTANTANEO (niente dialog)
+  
   const handleReject = async (id) => {
     if (!id) return;
     setBusyId(id);
@@ -137,12 +137,11 @@ export default function ScheduleRequests() {
 
       {!loading && empty && <Alert severity="info">Nessuna richiesta in attesa.</Alert>}
 
-      {/* UNA riga per richiesta, a larghezza piena, allineata alle tab */}
       <Stack spacing={1}>
         {items.map(a => (
           <Paper key={a._id} variant="outlined" sx={{ p: 2, width: '100%' }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              {/* testo a sinistra */}
+              
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography fontWeight="bold">{formatDT(a.date)}</Typography>
                 <Typography variant="body2" color="text.secondary" noWrap>
@@ -159,7 +158,7 @@ export default function ScheduleRequests() {
                 )}
               </Box>
 
-              {/* icone all’ESTREMA destra */}
+              
               <Stack direction="row" spacing={0.5} alignItems="center">
                 <Tooltip title="Accetta">
                   <span>
@@ -204,7 +203,6 @@ export default function ScheduleRequests() {
         ))}
       </Stack>
 
-      {/* ACCETTA */}
       <Dialog open={!!acceptId} onClose={() => setAcceptId(null)} fullWidth maxWidth="sm">
         <DialogTitle>Accetta appuntamento</DialogTitle>
         <DialogContent>
@@ -240,7 +238,7 @@ export default function ScheduleRequests() {
         </DialogActions>
       </Dialog>
 
-      {/* RIPROGRAMMA */}
+   
       <Dialog open={!!reschedAppt} onClose={closeReschedule} fullWidth maxWidth="md">
         <DialogTitle>Riprogramma appuntamento</DialogTitle>
         <DialogContent dividers>

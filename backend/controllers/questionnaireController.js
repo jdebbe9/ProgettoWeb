@@ -4,13 +4,13 @@ const User = require('../models/User');
 const { notifyTherapist, getDisplayName } = require('../services/notify');
 
 
-// Helpers -------------------------------------------------
+
 function sanitizeResponses(raw) {
   if (!Array.isArray(raw)) return null;
 
-  const MAX_Q = 100;       // max numero di domande
-  const MAX_QL = 200;      // max chars domanda
-  const MAX_AL = 2000;     // max chars risposta
+  const MAX_Q = 100;       
+  const MAX_QL = 200;      
+  const MAX_AL = 2000;     
 
   if (raw.length === 0 || raw.length > MAX_Q) return null;
 
@@ -30,15 +30,15 @@ function sanitizeResponses(raw) {
   return cleaned;
 }
 
-// POST /api/questionnaire
+
 exports.submitQuestionnaire = async (req, res) => {
   try {
-    // (Opzionale) Solo i pazienti possono inviare il questionario
+   
     if (req.user?.role === 'therapist') {
       return res.status(403).json({ message: 'Solo i pazienti possono inviare il questionario' });
     }
 
-    // Evita doppio invio
+    
     const already = await QuestionnaireResponse.findOne({ user: req.user.id });
     if (already) return res.status(409).json({ message: 'Questionario già inviato' });
 
@@ -52,10 +52,10 @@ exports.submitQuestionnaire = async (req, res) => {
       responses: cleaned,
     });
 
-    // Aggiorna flag utente (utile per la UI)
+    
     await User.findByIdAndUpdate(req.user.id, { questionnaireDone: true });
 
-    // 🔔 Notifica il terapeuta: questionario completato
+    
     try {
       const patientName = await getDisplayName(req.user.id);
       await notifyTherapist({
@@ -68,7 +68,7 @@ exports.submitQuestionnaire = async (req, res) => {
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[questionnaire:submit] notifyTherapist failed:', notifyErr?.message);
       }
-      // Non bloccare la risposta al client per errori di notifica
+      
     }
 
     return res.status(201).json({
@@ -81,12 +81,11 @@ exports.submitQuestionnaire = async (req, res) => {
   }
 };
 
-// GET /api/questionnaire/me
 exports.getMyQuestionnaire = async (req, res) => {
   try {
     const response = await QuestionnaireResponse
       .findOne({ user: req.user.id })
-      .select('-__v -user'); // opzionale: non esporre campi inutili
+      .select('-__v -user'); 
 
     if (!response) return res.status(404).json({ message: 'Nessun questionario trovato' });
     return res.json(response);

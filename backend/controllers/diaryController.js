@@ -25,16 +25,12 @@ function normalizeEmotions(arr) {
     .filter((e) => ALLOWED_EMOTIONS.includes(e));
 }
 
-/**
- * POST /api/diary
- * Crea una nuova voce diario.
- * Body: { content?, mood?, emotions?, shared? }
- */
+
 exports.createDiaryEntry = async (req, res) => {
   try {
     const { content: bodyContent, mood, emotions, shared } = req.body || {};
 
-    // content è facoltativo ma max 5000
+  
     const content = normalizeContent(bodyContent);
     if (content.length > 5000) {
       return res.status(400).json({ message: 'Il contenuto supera i 5000 caratteri' });
@@ -58,11 +54,7 @@ exports.createDiaryEntry = async (req, res) => {
   }
 };
 
-/**
- * GET /api/diary?page=&limit=
- * Lista le voci dell’utente, ordinate per data (desc).
- * Query opzionali: mood (1..5), hasEmotions=true, from, to (ISO date)
- */
+
 exports.getMyDiaryEntries = async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page ?? '1', 10) || 1);
@@ -70,7 +62,7 @@ exports.getMyDiaryEntries = async (req, res) => {
 
     const filter = { user: req.user.id };
 
-    // Filtri opzionali
+
     if (req.query.mood) {
       const m = coerceMood(req.query.mood, NaN);
       if (Number.isFinite(m)) filter.mood = m;
@@ -110,10 +102,7 @@ exports.getMyDiaryEntries = async (req, res) => {
   }
 };
 
-/**
- * PATCH /api/diary/:entryId
- * Aggiornamento parziale: content, mood, emotions, shared
- */
+
 exports.updateDiaryEntry = async (req, res) => {
   try {
     const { entryId } = req.params;
@@ -162,10 +151,7 @@ exports.updateDiaryEntry = async (req, res) => {
   }
 };
 
-/**
- * (Opzionale) DELETE /api/diary/:entryId
- * Abilitare la rotta se necessario.
- */
+
 exports.deleteDiaryEntry = async (req, res) => {
   try {
     const { entryId } = req.params;

@@ -13,10 +13,10 @@ import { useAuth } from '../context/AuthContext';
 import { createAppointment, listAppointments } from '../api/appointments';
 import { getSlotsAvailability } from '../api/slots';
 import { connectSocket } from '../realtime/socket';
-import { getMe as fetchMe } from '../api/user'; // ✅ usa /api/user/me
+import { getMe as fetchMe } from '../api/user'; 
 
 const THERAPIST_NAME = import.meta.env.VITE_THERAPIST_NAME || 'Il tuo terapeuta';
-const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h slot, lun–ven
+const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; 
 
 function ymd(date) {
   const d = new Date(date);
@@ -50,11 +50,11 @@ function computeProfileCompleteLocal(obj) {
 }
 
 
-// griglia settimanale
+
 function startOfWeek(d) {
   const tmp = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const day = tmp.getDay(); // 0 dom
-  const diff = (day === 0 ? -6 : 1 - day); // lunedì
+  const day = tmp.getDay(); 
+  const diff = (day === 0 ? -6 : 1 - day); 
   tmp.setDate(tmp.getDate() + diff);
   tmp.setHours(0,0,0,0);
   return tmp;
@@ -66,35 +66,35 @@ export default function Appointments() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState(0); // 0=Calendario, 1=I miei Appuntamenti
+  const [tab, setTab] = useState(0);
   const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
 
   const [items, setItems] = useState([]);
 
-  // Calendario settimanale
+  
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const weekDays = useMemo(() => [0,1,2,3,4].map(i => addDays(weekStart, i)), [weekStart]); // lun–ven
+  const weekDays = useMemo(() => [0,1,2,3,4].map(i => addDays(weekStart, i)), [weekStart]); 
 
-  // Disponibilità: mappa { 'YYYY-MM-DD': slots[] }
+  
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [avail, setAvail] = useState({});
 
-  // Dialog prenotazione: scelta modalità
+  
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [pendingSlot, setPendingSlot] = useState(null);
-  const [requestedMode, setRequestedMode] = useState('in_person'); // 'in_person' | 'online'
+  const [requestedMode, setRequestedMode] = useState('in_person');
 
-  // Dialog pre-avviso per apertura link online
+
   const [joinDialog, setJoinDialog] = useState({ open: false, link: '' });
 
-  // Dialog storico
+  
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const questionnaireDone = user?.questionnaireDone;
   const reloadTmrRef = useRef(null);
   const uid = user?._id || user?.id;
 
-  // ⬇️ profilo completo?
+ 
   const [profileOk, setProfileOk] = useState(true);
 
 
@@ -104,7 +104,7 @@ export default function Appointments() {
     const ok = Boolean(data?.profileComplete) || computeProfileCompleteLocal(data);
     setProfileOk(ok);
   } catch {
-    // se fallisce, non cambiare lo stato
+    // s
   }
 }, []);
 
@@ -135,12 +135,12 @@ export default function Appointments() {
     }
   }, [weekDays]);
 
-  // ✅ reagisci SUBITO a cambi dell'AuthContext (post-salvataggio profilo)
+
   useEffect(() => {
     if (!user) return;
     if (user.profileComplete === true) { setProfileOk(true); return; }
 
-    // se non esposto, prova a calcolare localmente dai campi in context
+ 
     const localOk = computeProfileCompleteLocal({
       name: user.name, surname: user.surname, email: user.email,
       address: user.address, city: user.city, cap: user.cap, phone: user.phone,
@@ -148,7 +148,7 @@ export default function Appointments() {
     setProfileOk(localOk);
   }, [user]);
 
-  // ⬇️ ulteriore conferma dal server (non blocca se fallisce)
+ 
   useEffect(() => {
     let on = true;
     (async () => {
@@ -160,17 +160,17 @@ export default function Appointments() {
           computeProfileCompleteLocal(data);
         setProfileOk(ok);
       } catch {
-        // se fallisce la lettura profilo, non blocchiamo: lasciamo profileOk come già calcolato
+        // s
       }
     })();
     return () => { on = false; };
-  }, [user]); // rilegge quando cambia l'utente
+  }, [user]); 
 
-  // first loads
+
   useEffect(() => { if (user) fetchAppointments(); }, [user, fetchAppointments]);
   useEffect(() => { if (user) loadAvailabilities(); }, [user, loadAvailabilities]);
 
-  // toast post-questionario (pulizia URL)
+
   useEffect(() => {
     const fromState = location.state?.questionnaireJustCompleted === true;
     const fromStorage = localStorage.getItem('pc_qc_toast') === '1';
@@ -180,16 +180,16 @@ export default function Appointments() {
     }
   }, [location, navigate]);
 
-  // ⬇️ ricalcola al mount, e ogni volta che la finestra torna in focus
+ 
 useEffect(() => {
-  refreshProfileOk(); // subito
+  refreshProfileOk(); 
   const onFocus = () => refreshProfileOk();
   window.addEventListener('focus', onFocus);
   return () => window.removeEventListener('focus', onFocus);
 }, [refreshProfileOk]);
 
 
-  // realtime reload
+ 
   const reloadDebounced = useCallback(() => {
     if (reloadTmrRef.current) clearTimeout(reloadTmrRef.current);
     reloadTmrRef.current = setTimeout(() => {
@@ -218,7 +218,7 @@ useEffect(() => {
     };
   }, [user, uid, fetchAppointments, loadAvailabilities, reloadDebounced]);
 
-  // giorni prenotati (blocca doppia prenotazione nello stesso giorno)
+ 
   const bookedDays = useMemo(() => {
     const set = new Set();
     for (const a of items) {
@@ -230,7 +230,7 @@ useEffect(() => {
     return set;
   }, [items]);
 
-  // giorni con confermata (per rendere trasparenti gli slot di quel giorno)
+  
   const acceptedDays = useMemo(() => {
     const set = new Set();
     for (const a of items) {
@@ -239,7 +239,7 @@ useEffect(() => {
     return set;
   }, [items]);
 
-  // Liste per la tab "I miei Appuntamenti"
+ 
   const nowTS = Date.now();
   const upcoming = useMemo(
     () => items
@@ -260,7 +260,7 @@ useEffect(() => {
     [items, nowTS]
   );
 
-  // booking flow
+  
   async function handleConfirmBooking() {
     if (!pendingSlot) return;
     const start = safeDate(pendingSlot.start);
@@ -283,7 +283,7 @@ useEffect(() => {
   }
 
   function openModeDialog(slot) {
-    if (!profileOk) { showSnack('Completa il tuo profilo prima di prenotare.', 'warning'); return; } // ⬅️ blocco profilo
+    if (!profileOk) { showSnack('Completa il tuo profilo prima di prenotare.', 'warning'); return; } 
     if (!questionnaireDone) { showSnack('Prima completa il questionario.', 'warning'); return; }
     const start = safeDate(slot?.start);
     const end = safeDate(slot?.end);
@@ -304,7 +304,7 @@ useEffect(() => {
     if (link) window.open(link, '_blank', 'noopener,noreferrer');
   }
 
-  // header settimana (uguale al terapeuta)
+ 
   const header = (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
@@ -328,7 +328,7 @@ useEffect(() => {
     <Box className="container" sx={{ mt: 3, maxWidth: 1200 }}>
       
 
-      {/* ⬇️ Avviso profilo incompleto */}
+      
       {!questionnaireDone && (
   <Alert
     severity="warning"
@@ -357,7 +357,7 @@ useEffect(() => {
   </Alert>
 )}
 
-      {/* Tabs: Calendario / I miei Appuntamenti */}
+      
       <Paper sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_,v)=>setTab(v)} variant="scrollable" scrollButtons="auto">
           <Tab label="Calendario" />
@@ -370,7 +370,7 @@ useEffect(() => {
           {header}
 
           <Paper variant="outlined" sx={{ p: 1.5 }}>
-            {/* intestazione giorni */}
+           
             <Box
               sx={{
                 display: 'grid',
@@ -469,7 +469,7 @@ useEffect(() => {
         </Paper>
       )}
 
-      {/* Dialog: STORICO */}
+     
       <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Storico appuntamenti</DialogTitle>
         <DialogContent dividers>
@@ -491,7 +491,7 @@ useEffect(() => {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog scelta modalità prenotazione */}
+    
       <Dialog open={modeDialogOpen} onClose={() => setModeDialogOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Seleziona modalità</DialogTitle>
         <DialogContent>
@@ -522,7 +522,7 @@ useEffect(() => {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog pre-avviso per apertura link online */}
+     
       <Dialog open={joinDialog.open} onClose={() => setJoinDialog({ open: false, link: '' })} fullWidth maxWidth="xs">
         <DialogTitle>Apri la visita online?</DialogTitle>
         <DialogContent>
@@ -556,7 +556,7 @@ function PatientSlotRow({
 
   return (
     <>
-      {/* colonna orario */}
+   
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', pr: 1 }}>
         <Typography variant="body2">{label}</Typography>
       </Box>
@@ -569,7 +569,7 @@ function PatientSlotRow({
           return ds && ds.getHours() === hour;
         });
 
-        // mio appuntamento in questo slot?
+        
         const myAppt = slot
           ? items.find(a =>
               (a.status === 'pending' || a.status === 'accepted') &&
@@ -581,12 +581,12 @@ function PatientSlotRow({
         const isPast = end ? end <= today : true;
 
         const alreadyInDay = bookedDays.has(dateStr);
-        const confirmedThisDay = acceptedDays.has(dateStr); // per trasparenza
+        const confirmedThisDay = acceptedDays.has(dateStr); 
 
         const isBusy = !slot || slot.busy || isPast;
         const isFree = slot && !slot.busy && !isPast && d.getTime() >= tomorrow0.getTime() && !alreadyInDay;
 
-        // stato visivo come terapeuta
+       
         let stateSx;
         if (myAppt && String(myAppt.status).toLowerCase() === 'accepted') {
           stateSx = { bgcolor: 'success.main', color: 'success.contrastText', borderColor: 'success.dark' };
@@ -630,7 +630,7 @@ function PatientSlotRow({
               </Typography>
             )}
 
-            {/* icona laptop per accepted online */}
+          
             {myAppt && String(myAppt.status).toLowerCase() === 'accepted' && myAppt.isOnline && myAppt.videoLink && (
               <Tooltip title="Apri visita online">
                 <IconButton

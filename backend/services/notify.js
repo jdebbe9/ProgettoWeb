@@ -30,7 +30,7 @@ async function notifyUser(userId, { type, title, body, data }){
 
   const doc = await Notification.create({
     userId,
-    user: userId,            // compat
+    user: userId,          
     type: type || 'INFO',
     title: title || '',
     body: body || '',
@@ -39,7 +39,7 @@ async function notifyUser(userId, { type, title, body, data }){
     isRead: false,
   });
 
-  // evento "nuova notifica"
+
   emitToUser(userId, 'notification:new', {
     _id: doc._id,
     type: doc.type,
@@ -49,7 +49,6 @@ async function notifyUser(userId, { type, title, body, data }){
     data: doc.data || {},
   });
 
-  // evento con conteggio aggiornato
   const count = await Notification.countDocuments(unreadConditionFor(userId));
   emitToUser(userId, 'notifications:unread', { count });
 

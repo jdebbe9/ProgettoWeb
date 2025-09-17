@@ -22,7 +22,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
   const [err, setErr] = useState('');
   const [details, setDetails] = useState(null);
 
-  // assign dialog
+
   const [assignOpen, setAssignOpen] = useState(false);
 
   useEffect(() => {
@@ -67,14 +67,14 @@ export default function PatientDrawer({ open, onClose, patient }) {
       transitionDuration={0}
       ModalProps={{ keepMounted: true }}
       sx={{
-        // stile base del pannello
+       
         '& .MuiDrawer-paper': { width: 440, p: 2, position: 'fixed' },
-        // forza posizionamento a destra (anche se per errore l’anchor fosse left)
+        
         '& .MuiDrawer-paperAnchorRight': { right: 0, left: 'auto' },
         '& .MuiDrawer-paperAnchorLeft':  { right: 0, left: 'auto' }
       }}
     >
-      {/* X in alto a destra */}
+      
       <IconButton
         aria-label="Chiudi"
         onClick={onClose}
@@ -100,7 +100,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
         </Box>
       ) : !details ? null : (
         <Stack spacing={2}>
-          {/* Header */}
+          
           <Box>
             <Typography variant="h6">{fullName(details.user)}</Typography>
             <Typography variant="body2" color="text.secondary">{details.user?.email}</Typography>
@@ -136,7 +136,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
 
           <Divider />
 
-          {/* Questionario */}
+         
           <Box>
             <Typography variant="subtitle2">Questionario</Typography>
             {questionnaire ? (
@@ -148,7 +148,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
             )}
           </Box>
 
-          {/* Prossimo appuntamento */}
+          
           <Box>
             <Typography variant="subtitle2">Prossimo appuntamento</Typography>
             {nextAppointment ? (
@@ -163,7 +163,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
             )}
           </Box>
 
-          {/* Ultime note di diario */}
+          
           <Box>
             <Typography variant="subtitle2">Ultime voci di diario</Typography>
             {lastDiary.length === 0 ? (
@@ -186,7 +186,7 @@ export default function PatientDrawer({ open, onClose, patient }) {
         </Stack>
       )}
 
-      {/* Dialog assegnazione */}
+      
       <AssignToPatientDialog
         open={assignOpen}
         onClose={() => setAssignOpen(false)}

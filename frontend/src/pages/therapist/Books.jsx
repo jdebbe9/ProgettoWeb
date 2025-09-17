@@ -96,7 +96,7 @@ export default function Books() {
 
   return (
     <Box sx={{ p:2 }}>
-      {/* Header */}
+     
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="h5">Libri</Typography>
         <Button variant="contained" onClick={() => navigate('/therapist/books/new')}>Nuovo libro</Button>
@@ -107,7 +107,7 @@ export default function Books() {
 
       {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
 
-      {/* Toolbar */}
+     
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Grid container alignItems="center" spacing={2}>
           <Grid item xs>
@@ -119,7 +119,7 @@ export default function Books() {
                 sx={{ maxWidth: 360 }}
               />
 
-              {/* ⬇️ Label nel bordo (notch) */}
+              
               <FormControl size="small" sx={{ minWidth: 220 }}>
                 <InputLabel id="book-order-by-label" shrink>Ordina per</InputLabel>
                 <Select
@@ -142,7 +142,7 @@ export default function Books() {
         </Grid>
       </Paper>
 
-      {/* Lista: 3 colonne fisse */}
+    
       {loading ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -209,7 +209,7 @@ export default function Books() {
                     </Stack>
                   </CardContent>
 
-                  {/* AZIONI: icone */}
+                  
                   <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                     <Stack direction="row" spacing={1}>
                       <Tooltip title="Assegna">
@@ -267,7 +267,7 @@ export default function Books() {
         item={assignItem}
       />
 
-      {/* Dialog conferma eliminazione */}
+    
       <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
         <DialogTitle>Eliminare questo libro?</DialogTitle>
         <DialogContent dividers>

@@ -5,7 +5,7 @@ function getUserId(req) {
   return (req?.user && (req.user._id || req.user.id)) || req?.auth?.userId || null;
 }
 
-// GET /api/books?q=&status=
+
 exports.listBooks = async (req, res, next) => {
   try {
     const owner = getUserId(req);
@@ -25,7 +25,7 @@ exports.listBooks = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// POST /api/books
+
 exports.createBook = async (req, res, next) => {
   try {
     const owner = getUserId(req);
@@ -40,7 +40,7 @@ exports.createBook = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// GET /api/books/:id
+
 exports.getBook = async (req, res, next) => {
   try {
     const owner = getUserId(req);
@@ -50,7 +50,7 @@ exports.getBook = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// PATCH /api/books/:id
+
 exports.updateBook = async (req, res, next) => {
   try {
     const owner = getUserId(req);
@@ -64,7 +64,7 @@ exports.updateBook = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// DELETE /api/books/:id
+
 exports.deleteBook = async (req, res, next) => {
   try {
     const owner = getUserId(req);

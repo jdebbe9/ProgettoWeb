@@ -14,7 +14,7 @@ async function resolveTherapistId() {
 function generateSlotsForDay(dateStr) {
   const [Y, M, D] = dateStr.split('-').map((x) => parseInt(x, 10));
   const day = new Date(Y, (M - 1), D, 0, 0, 0, 0);
-  const dow = day.getDay(); // 0=dom, 6=sab
+  const dow = day.getDay(); 
   if (dow === 0 || dow === 6) return [];
   const mk = (h, m=0) => new Date(Y, (M - 1), D, h, m, 0, 0);
   const hours = [8,9,10,11,12, 15,16,17,18,19];

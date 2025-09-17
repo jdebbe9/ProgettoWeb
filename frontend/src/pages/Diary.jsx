@@ -354,7 +354,7 @@ export default function Diary() {
         <Typography variant="h5" sx={{ mb:1.5 }}>Diario</Typography>
 
         <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
-          {/* filtro date */}
+        
           <TextField label="Dal" type="date" size="small" value={fromStr} onChange={(e) => setFromStr(e.target.value)} InputLabelProps={{ shrink: true }} />
           <TextField label="Al"  type="date" size="small" value={toStr}  onChange={(e) => setToStr(e.target.value)}  InputLabelProps={{ shrink: true }} />
           {(fromStr || toStr) && (
@@ -363,7 +363,7 @@ export default function Diary() {
             </IconButton>
           )}
 
-          {/* Nuova voce */}
+        
           <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
             Nuova voce
           </Button>
@@ -380,12 +380,12 @@ export default function Diary() {
         </Paper>
       ) : (
         <Stack direction="row" alignItems="stretch" justifyContent="center" gap={1}>
-          {/* Giorno precedente */}
+        
           <IconButton onClick={goPrevDay} disabled={!canPrevDay} size="large" sx={{ alignSelf: 'center' }}>
             <ChevronLeftIcon fontSize="inherit" />
           </IconButton>
 
-          {/* PAGINA */}
+       
           <Paper
             ref={pageRef}
             onTouchStart={onTouchStart}
@@ -410,7 +410,7 @@ export default function Diary() {
               }
             }}
           >
-            {/* header pagina */}
+          
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
                 {toLocal(current.createdAt || current.date || current.created_at)}
@@ -435,7 +435,7 @@ export default function Diary() {
 
             <Divider sx={{ my: 2 }} />
 
-            {/* tutte le note del giorno */}
+           
             <Stack spacing={2} sx={{ minHeight: 260 }}>
               {(() => {
                 const key = currentDay;
@@ -482,7 +482,7 @@ export default function Diary() {
               })()}
             </Stack>
 
-            {/* footer pagina */}
+         
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -503,23 +503,23 @@ export default function Diary() {
             </Stack>
           </Paper>
 
-          {/* Giorno successivo */}
+        
           <IconButton onClick={goNextDay} disabled={!canNextDay} size="large" sx={{ alignSelf: 'center' }}>
             <ChevronRightIcon fontSize="inherit" />
           </IconButton>
         </Stack>
       )}
 
-      {/* --- STATISTICHE UMORE (sotto al diario) --- */}
+     
       <MoodStats entries={entries} />
 
-      {/* Dialog: nuova voce */}
+    
       <Dialog open={isCreating} onClose={closeCreate} fullWidth maxWidth="sm">
         <DialogTitle>Nuova Voce del Diario</DialogTitle>
         <form onSubmit={handleSubmit(onSubmitCreate)}>
           <DialogContent>
             <Stack spacing={2}>
-              {/* Umore */}
+             
               <Stack>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Stato d&apos;animo</Typography>
                 <Controller
@@ -555,7 +555,7 @@ export default function Diary() {
                 />
               </Stack>
 
-              {/* Emozioni */}
+       
               <Stack>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Emozioni</Typography>
                 <Stack direction="row" gap={1} flexWrap="wrap">
@@ -578,7 +578,7 @@ export default function Diary() {
                 </Stack>
               </Stack>
 
-              {/* Testo */}
+         
               <Controller
                 name="content"
                 control={control}
@@ -605,7 +605,7 @@ export default function Diary() {
         </form>
       </Dialog>
 
-      {/* animazione sfoglio */}
+      
       <style>{`
         .pageFlip { animation: pageFlip .3s ease-out; }
         @keyframes pageFlip {

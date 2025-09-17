@@ -102,7 +102,7 @@ export default function Goals(){
         <Typography variant="h5" sx={{ mb:1.5 }}>Obiettivi</Typography>
         {err && <Alert severity="error">{err}</Alert>}
 
-        {/* Nuovo obiettivo */}
+        
         <Paper variant="outlined">
           <Box p={2}>
             <Stack direction={{ xs:'column', md:'row' }} spacing={2} alignItems={{ md:'center' }}>
@@ -123,7 +123,7 @@ export default function Goals(){
           </Box>
         </Paper>
 
-        {/* Tabella semplice */}
+      
         <TableContainer component={Paper} variant="outlined">
           <Table size="small" aria-label="Tabella obiettivi">
             <TableHead>

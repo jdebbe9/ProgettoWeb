@@ -10,7 +10,7 @@ const AssignmentSchema = new mongoose.Schema({
   note:      { type: String, trim: true, default: '' }
 }, { timestamps: true });
 
-// Evita doppie assegnazioni dello stesso materiale allo stesso paziente
+
 AssignmentSchema.index({ patient: 1, itemType: 1, item: 1 }, { unique: true });
 
 module.exports = mongoose.model('Assignment', AssignmentSchema);

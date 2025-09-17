@@ -5,7 +5,7 @@ function getUserId(req) {
   return (req?.user && (req.user._id || req.user.id)) || req?.auth?.userId || null;
 }
 
-// GET /api/articles/public?q=&tag=&limit=&author=
+
 exports.listPublishedArticles = async (req, res, next) => {
   try {
     const { q, tag, limit, author } = req.query;
@@ -31,7 +31,7 @@ exports.listPublishedArticles = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// GET /api/articles/public/:id
+
 exports.getPublishedArticle = async (req, res, next) => {
   try {
     const doc = await Article.findOne({ _id: req.params.id, status: 'published' }).lean();
@@ -40,7 +40,7 @@ exports.getPublishedArticle = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// GET /api/articles?q=&status=&tag=
+
 exports.listArticles = async (req, res, next) => {
   try {
     const author = getUserId(req);
@@ -61,7 +61,7 @@ exports.listArticles = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// POST /api/articles
+
 exports.createArticle = async (req, res, next) => {
   try {
     const author = getUserId(req);
@@ -76,7 +76,7 @@ exports.createArticle = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// GET /api/articles/:id
+
 exports.getArticle = async (req, res, next) => {
   try {
     const author = getUserId(req);
@@ -86,7 +86,7 @@ exports.getArticle = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// PATCH /api/articles/:id
+
 exports.updateArticle = async (req, res, next) => {
   try {
     const author = getUserId(req);
@@ -105,7 +105,7 @@ exports.updateArticle = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// DELETE /api/articles/:id
+
 exports.deleteArticle = async (req, res, next) => {
   try {
     const author = getUserId(req);

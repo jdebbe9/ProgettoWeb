@@ -1,14 +1,13 @@
 // src/api/auth.js
 import api, { setAccessToken } from './axios';
 
-// LOGIN
+
 export async function login({ email, password }) {
   const { data } = await api.post('/auth/login', { email, password });
   if (data?.accessToken) setAccessToken(data.accessToken);
   return data?.user || data;
 }
 
-// LOGOUT
 export async function logout() {
   try {
     await api.post('/auth/logout');
@@ -17,7 +16,7 @@ export async function logout() {
   }
 }
 
-// ME
+
 export async function me() {
   const { data } = await api.get('/auth/me');
   return data?.user || data;
@@ -28,15 +27,14 @@ export async function updateMe(payload) {
   return data;
 }
 
-// REFRESH (manuale, se mai ti servisse esplicitamente)
-// NB: l'interceptor in axios.js evita loop su /auth/refresh
+
 export async function refresh() {
   const { data } = await api.post('/auth/refresh', {});
   if (data?.accessToken) setAccessToken(data.accessToken);
   return data;
 }
 
-// REGISTER (paziente)
+
 export async function register(payload) {
   const { data } = await api.post('/auth/register', payload);
   return data;

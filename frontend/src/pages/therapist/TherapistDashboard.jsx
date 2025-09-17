@@ -17,36 +17,36 @@ import { listAppointments } from '../../api/appointments';
 import { getAllPatients } from '../../api/therapists';
 import { connectSocket } from '../../realtime/socket';
 
-/* -------------------- helpers -------------------- */
+
 const ACCEPTED = new Set(['accepted', 'rescheduled']);
 const NEGATIVE = new Set(['cancelled', 'rejected']);
 
-/** === UI TUNING (modifica qui per personalizzare) === */
+
 const LAYOUT = {
-  // KPI
+
   kpiIconBox: 44,
   kpiIconSize: 22,
   kpiMinHeight: 120,
 
-  // Attività recente
+  
   activity: {
-    maxVisible: 3,       // dopo 3 eventi scorre
-    rowApproxHeight: 68, // evento compatto ma leggibile
+    maxVisible: 3,      
+    rowApproxHeight: 68, 
     listGap: 1,
-    itemPadding: 0.75,   // se presente nel sx degli item
+    itemPadding: 0.75,   
   },
 
-  // Promemoria (altezza “pari” ad Attività ~320px)
+ 
   reminders: {
     buttonSize: 'small',
     fieldSize: 'medium',
     inputMinRows: 2.1,
     panelMinHeight: 285,
-    panelMaxHeight: 285, // fisso -> combacia visivamente con Attività
+    panelMaxHeight: 285, 
   },
 };
 
-/* ==================================================== */
+
 
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
 function endOfDay(d) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
@@ -54,9 +54,9 @@ function inRange(date, a, b) { const t = new Date(date).getTime(); return t >= a
 function fmtDT(d) { try { return new Date(d).toLocaleString('it-IT'); } catch { return '—'; } }
 function fullName(p) { return `${p?.name || ''} ${p?.surname || ''}`.trim(); }
 
-/* ======================= LOGICA STATISTICHE (hook) ======================= */
+
 function useStatistics(appointments, patients) {
-  const [statPeriod, setStatPeriod] = useState('30'); // '7' | '30' | '90' | 'ytd'
+  const [statPeriod, setStatPeriod] = useState('30'); 
 
   const { from, to } = useMemo(() => {
     const now = new Date();
@@ -66,7 +66,7 @@ function useStatistics(appointments, patients) {
       const start = startOfDay(new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000));
       return { from: start, to: end };
     }
-    // YTD
+
     const yStart = startOfDay(new Date(now.getFullYear(), 0, 1));
     return { from: yStart, to: end };
   }, [statPeriod]);
@@ -83,7 +83,7 @@ function useStatistics(appointments, patients) {
 
     const newPts = (patients || []).filter(p => inRange(p.createdAt, from, to)).length;
 
-    // Questionari basati sui pazienti creati nel periodo
+
     const periodPatients = (patients || []).filter(p => inRange(p.createdAt, from, to));
     const qDone = periodPatients.filter(p => !!p.questionnaireDone).length;
     const qTot  = periodPatients.length;
@@ -98,19 +98,18 @@ function useStatistics(appointments, patients) {
     };
   }, [inPeriodApps, patients, from, to]);
 
-  // Trend settimanale (bucket lun-dom dentro il periodo)
   const trendWeekly = useMemo(() => {
     const buckets = [];
     const start = new Date(from);
     const end   = new Date(to);
 
-    // allinea start al lunedì
+  
     const day = start.getDay(); // 0=dom
     const offsetToMon = (day === 0 ? -6 : 1 - day);
     start.setDate(start.getDate() + offsetToMon);
     start.setHours(0,0,0,0);
 
-    // settimane fino a "to"
+   
     let cur = new Date(start);
     while (cur <= end) {
       const weekStart = new Date(cur);
@@ -129,7 +128,7 @@ function useStatistics(appointments, patients) {
     return series.map(s => ({ ...s, pct: Math.round((s.count / max) * 100) }));
   }, [inPeriodApps, from, to]);
 
-  // (lasciamo qui eventuali altri calcoli, anche se non usati)
+
   const slowRequests = useMemo(() => {
     const now = Date.now();
     return (appointments || [])
@@ -139,9 +138,7 @@ function useStatistics(appointments, patients) {
 
   return { statPeriod, setStatPeriod, stats, trendWeekly, slowRequests };
 }
-/* ======================================================================= */
 
-/* -------------------- component -------------------- */
 export default function TherapistDashboard() {
   const { user } = useAuth();
   const isTherapist = user?.role === 'therapist';
@@ -152,7 +149,7 @@ export default function TherapistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients]         = useState([]);
 
-  // Promemoria (localStorage per terapeuta corrente)
+
   const storageKey = `pcare:reminders:${user?._id || 'me'}`;
   const [notes, setNotes]     = useState([]);
   const [newNote, setNewNote] = useState('');
@@ -173,7 +170,7 @@ export default function TherapistDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // realtime: refresh leggero
+  
   useEffect(() => {
     if (!isTherapist) return;
     const s = connectSocket();
@@ -190,7 +187,7 @@ export default function TherapistDashboard() {
     };
   }, [isTherapist, loadData]);
 
-  // Promemoria: load/save
+ 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -212,7 +209,7 @@ export default function TherapistDashboard() {
   };
   const delNote = (id) => saveNotes(notes.filter(n => n.id !== id));
 
-  /* --------- derivazioni --------- */
+
   const todayCount = useMemo(() => {
     const now = new Date();
     const a = startOfDay(now), b = endOfDay(now);
@@ -257,13 +254,11 @@ export default function TherapistDashboard() {
       .sort((x,y)=> y.when - x.when);
   }, [appointments]);
 
-  /* ---- STATISTICHE: stato/calcoli ---- */
-  // 👉 tolgo dallo use le parti che non useremo in UI
+
   const { statPeriod, setStatPeriod, stats, trendWeekly } =
     useStatistics(appointments, patients);
 
-  /* -------------------- UI -------------------- */
-  // Card KPI (icone e testo allineati, supporta Icon o icon)
+ 
   const StatCard = ({ Icon, icon, title, value, sub, to }) => {
     const iconNode = Icon ? <Icon sx={{ fontSize: LAYOUT.kpiIconSize }} /> : icon || null;
     return (
@@ -276,7 +271,7 @@ export default function TherapistDashboard() {
             {iconNode}
           </Box>
 
-          {/* Blocco testuale centrato verticalmente */}
+          
           <Box sx={{ minWidth: 0, display: 'grid', alignContent: 'center', rowGap: 0.25 }}>
             <Typography variant="overline" color="text.secondary" noWrap>{title}</Typography>
             <Typography variant="h5" sx={{ lineHeight: 1.2 }}>{value}</Typography>
@@ -289,13 +284,12 @@ export default function TherapistDashboard() {
     );
   };
 
-  // Altezza massima scroll Attività = 3 eventi compatti
   const activityMaxHeight = useMemo(() => {
     const { maxVisible, rowApproxHeight, listGap } = LAYOUT.activity;
     return maxVisible * rowApproxHeight + (maxVisible - 1) * listGap;
   }, []);
 
-  /* -------------------- RENDER -------------------- */
+  
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h5" sx={{ mb: 1 }}>Dashboard</Typography>
@@ -304,11 +298,11 @@ export default function TherapistDashboard() {
 
       {loading ? <CircularProgress /> : (
         <>
-          {/* KPI: due per riga su >= sm */}
+          
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, // sempre 2↔2 per riga
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
               gap: 2,
               alignItems: 'stretch',
               mb: 2,
@@ -320,9 +314,9 @@ export default function TherapistDashboard() {
             <StatCard Icon={AssignmentTurnedInIcon} title="Questionari (ultimi 30 giorni)" value={`${q30.pct}% completati`} to="/therapist/patients" />
           </Box>
 
-          {/* Layout principale: 2 colonne uguali */}
+         
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr' }, gap: 2, alignItems: 'start' }}>
-            {/* Colonna sinistra: Attività recente */}
+           
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Typography variant="subtitle1">Attività recente</Typography>
               <Divider sx={{ my: 1 }} />
@@ -335,7 +329,7 @@ export default function TherapistDashboard() {
                     maxHeight: activityMaxHeight,
                     overflowY: 'auto',
                     pr: 1,
-                    // Scrollbar chiara, sottile
+                  
                     '&::-webkit-scrollbar': { width: 6 },
                     '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
                     '&::-webkit-scrollbar-thumb': {
@@ -360,7 +354,7 @@ export default function TherapistDashboard() {
               )}
             </Paper>
 
-            {/* Colonna destra: Promemoria */}
+           
             <Paper
               variant="outlined"
               sx={{
@@ -384,7 +378,7 @@ export default function TherapistDashboard() {
                   multiline
                   minRows={LAYOUT.reminders.inputMinRows}
                 />
-                {/* Bottone identico a "APRI" */}
+             
                 <Button
                   variant="text"
                   size="small"
@@ -401,7 +395,6 @@ export default function TherapistDashboard() {
                 <Box
                   sx={{
                     overflowY: 'auto',
-                    // Scrollbar identica ad "Attività recente"
                     '&::-webkit-scrollbar': { width: 6 },
                     '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
                     '&::-webkit-scrollbar-thumb': {
@@ -435,7 +428,7 @@ export default function TherapistDashboard() {
             </Paper>
           </Box>
 
-          {/* ======================= SEZIONE STATISTICHE ======================= */}
+         
           <Box sx={{ mt: 3 }}>
             <Paper variant="outlined" sx={{ p: 2 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" spacing={1}>
@@ -456,7 +449,7 @@ export default function TherapistDashboard() {
                 </FormControl>
               </Stack>
 
-              {/* KPI Statistiche */}
+             
               <Box
                 sx={{
                   mt: 2,
@@ -487,7 +480,7 @@ export default function TherapistDashboard() {
                 </Paper>
               </Box>
 
-              {/* Trend settimanale (barre) */}
+             
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" sx={{ mb: .5 }}>Trend settimanale (appuntamenti confermati)</Typography>
                 <Stack spacing={0.75}>
@@ -504,7 +497,7 @@ export default function TherapistDashboard() {
               </Box>
             </Paper>
           </Box>
-          {/* ===================== /SEZIONE STATISTICHE ===================== */}
+         
         </>
       )}
     </Box>

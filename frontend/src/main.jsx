@@ -12,7 +12,7 @@ import './styles/globals.css'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider theme={theme}>
-      {/* abilita automatic color-scheme per OS */}
+      
       <CssBaseline enableColorScheme />
       <AuthProvider>
         <RouterProvider router={router} />

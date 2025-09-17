@@ -83,7 +83,7 @@ export default function Materials(){
 
   return (
     <Box sx={{ p:2, display:'grid', gap:3 }}>
-      {/* Sezione: Letture assegnate */}
+     
       <Box>
         <Typography variant="h5" sx={{ mb:1.5 }}>Letture assegnate</Typography>
 
@@ -116,7 +116,7 @@ export default function Materials(){
                         : 'Articolo'}
                     </Typography>
 
-                    {/* Link acquisto libro, se disponibile */}
+                  
                     {isBook && purchaseUrl && (
                       <Typography variant="body2" sx={{ mt: 0.25 }}>
                         <a
@@ -131,7 +131,7 @@ export default function Materials(){
                     )}
                   </Stack>
 
-                  {/* Stato compatto: Select a destra */}
+              
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Typography variant="caption" color="text.secondary">Stato</Typography>
                     <Select
@@ -158,7 +158,7 @@ export default function Materials(){
 
       <Divider />
 
-      {/* Sezione: Articoli del terapeuta */}
+     
       <Box>
         <Stack direction={{ xs:'column', sm:'row' }} spacing={2} alignItems={{ sm:'center' }} sx={{ mb:2 }}>
           <Typography variant="h5" sx={{ flexGrow:1 }}>Articoli pubblicati</Typography>
@@ -180,7 +180,7 @@ export default function Materials(){
             {availableTags.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </Select>
 
-          {/* ⬇️ Sostituisce il bottone 'Filtra' con icona imbuto */}
+          
           <Tooltip title="Filtra">
             <IconButton onClick={loadArticles} size="small" aria-label="Filtra articoli">
               <FilterListIcon />

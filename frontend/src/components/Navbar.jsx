@@ -108,7 +108,7 @@ export default function Navbar() {
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar a sinistra per utenti autenticati */}
+      
       {user && <Sidebar />}
     </>
   );

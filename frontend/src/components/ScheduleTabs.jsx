@@ -63,7 +63,7 @@ export default function ScheduleTabs() {
                   lineHeight: '6px',
                   px: 0.2,
                   borderRadius: '6px',
-                  transform: 'translate(50%, -50%)', // mantiene l’allineamento in alto a destra
+                  transform: 'translate(50%, -50%)', 
                 },
               }}
             >

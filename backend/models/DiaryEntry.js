@@ -15,7 +15,7 @@ const DiaryEntrySchema = new mongoose.Schema(
       index: true,
     },
 
-    // Testo facoltativo (max 5000)
+
     content: {
       type: String,
       trim: true,
@@ -23,14 +23,14 @@ const DiaryEntrySchema = new mongoose.Schema(
       default: '',
     },
 
-    // Visibilità (mantengo il campo che avevi già)
+   
     shared: {
       type: Boolean,
       default: true,
       index: true,
     },
 
-    // NUOVO: stato d’animo 1..5 (stile Salute)
+ 
     mood: {
       type: Number,
       min: 1,
@@ -39,7 +39,7 @@ const DiaryEntrySchema = new mongoose.Schema(
       index: true,
     },
 
-    // NUOVO: elenco emozioni (validate via enum)
+   
     emotions: [
       {
         type: String,
@@ -48,14 +48,14 @@ const DiaryEntrySchema = new mongoose.Schema(
     ],
   },
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true, 
   }
 );
 
-// Indice consigliato per query per utente e ordine cronologico
+
 DiaryEntrySchema.index({ user: 1, createdAt: -1 });
 
-// Esporta il Model e, come comodo, anche la lista delle emozioni consentite
+
 const DiaryEntry = mongoose.model('DiaryEntry', DiaryEntrySchema);
 DiaryEntry.ALLOWED_EMOTIONS = ALLOWED_EMOTIONS;
 

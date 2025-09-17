@@ -9,8 +9,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// ───────────────────────────────────────────────────────────────
-// Pannello riutilizzabile (named export)
+
 export function LoginPanel() {
   const { login } = useAuth() || {};
   const navigate = useNavigate();
@@ -102,8 +101,7 @@ export function LoginPanel() {
   );
 }
 
-// ───────────────────────────────────────────────────────────────
-// Pagina /login “bianca” che riusa il pannello
+
 export default function Login() {
   return (
     <Box sx={{ px: 2, py: 6, display: 'flex', justifyContent: 'center' }}>

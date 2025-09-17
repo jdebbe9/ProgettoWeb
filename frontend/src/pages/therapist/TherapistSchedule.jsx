@@ -9,19 +9,19 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
 import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import LaptopMacIcon from '@mui/icons-material/LaptopMac'; // ⬅️ nuova icona
+import LaptopMacIcon from '@mui/icons-material/LaptopMac'; 
 import { useAuth } from '../../context/AuthContext';
 import { listAppointments, updateAppointment } from '../../api/appointments';
 import { connectSocket } from '../../realtime/socket';
 import ScheduleTabs from '../../components/ScheduleTabs';
 import { getSlotsAvailability } from '../../api/slots';
 
-const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19]; // 1h per slot
-const WEEK_DAYS = 5; // Lun–Ven
+const SLOT_HOURS = [8, 9, 10, 11, 12, 15, 16, 17, 18, 19];
+const WEEK_DAYS = 5; 
 
 function startOfWeekMonday(date) {
   const d = new Date(date);
-  const day = d.getDay(); // 0..6 (0=dom)
+  const day = d.getDay(); 
   const diff = (day === 0 ? -6 : 1 - day);
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + diff);
@@ -51,7 +51,7 @@ function fullNameOrEmail(p) {
 }
 function safeDate(v){ const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; }
 
-// Stato visivo cella
+
 function statusToCell(stateRaw) {
   if (!stateRaw) return 'free';
   const s = String(stateRaw).toLowerCase();
@@ -61,7 +61,6 @@ function statusToCell(stateRaw) {
   return 'free';
 }
 
-// Etichetta italiana per stato
 function statusToLabel(stateRaw) {
   const s = String(stateRaw || '').toLowerCase();
   switch (s) {
@@ -90,7 +89,7 @@ export default function TherapistSchedule() {
   const [actionBusy, setActionBusy] = useState(false);
   const reloadTmrRef = useRef(null);
 
-  // Dialog: pre-avviso apertura link online
+ 
   const [joinDialog, setJoinDialog] = useState({ open: false, link: '' });
   const openJoinDialog = (link) => setJoinDialog({ open: true, link });
   const closeJoinDialog = () => setJoinDialog({ open: false, link: '' });
@@ -100,7 +99,6 @@ export default function TherapistSchedule() {
     if (link) window.open(link, '_blank', 'noopener,noreferrer');
   };
 
-  // Dialog: Riprogramma a slot
   const [reschedAppt, setReschedAppt] = useState(null);
   const [reschedWeekStart, setReschedWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const reschedDays = useMemo(() => Array.from({ length: WEEK_DAYS }, (_, i) => addDays(reschedWeekStart, i)), [reschedWeekStart]);
@@ -160,7 +158,7 @@ export default function TherapistSchedule() {
     }
   };
 
-  // socket
+
   useEffect(() => {
     if (!isTherapist) return;
     const s = connectSocket();
@@ -190,7 +188,7 @@ export default function TherapistSchedule() {
   useEffect(() => { loadAppointments(); }, [loadAppointments]);
   useEffect(() => { if (reschedAppt) loadReschedAvail(); }, [reschedAppt, reschedWeekStart, loadReschedAvail]);
 
-  // indicizza per slot (ignora rejected/cancelled)
+  
   const slotMap = useMemo(() => {
     const map = new Map();
     const rank = (st) => {
@@ -230,7 +228,7 @@ export default function TherapistSchedule() {
     <Box className="container" sx={{ mt: 3, maxWidth: 1100 }}>
       <ScheduleTabs />
 
-      {/* Banner introduttivo */}
+      
       <Alert severity="info" sx={{ mb: 2 }}>
         <strong>Gestisci le prenotazioni dei pazienti. </strong> 
         Naviga tra le settimane, visualizza gli appuntamenti, riprogramma su uno slot libero e apri la visita online quando disponibile.
@@ -252,11 +250,11 @@ export default function TherapistSchedule() {
           </Typography>
         </Stack>
 
-        {/* Legenda rimossa */}
+        
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 1.5 }}>
-        {/* Header giorni */}
+      
         <Box
           sx={{
             display: 'grid',
@@ -278,7 +276,7 @@ export default function TherapistSchedule() {
 
         <Divider sx={{ mb: 1 }} />
 
-        {/* Griglia slot */}
+       
         <Box
           sx={{
             display: 'grid',
@@ -304,7 +302,7 @@ export default function TherapistSchedule() {
         </Box>
       </Paper>
 
-      {/* Dialog pre-avviso apertura link */}
+      
       <Dialog open={joinDialog.open} onClose={closeJoinDialog} fullWidth maxWidth="xs">
         <DialogTitle>Apri la visita online?</DialogTitle>
         <DialogContent>
@@ -319,7 +317,7 @@ export default function TherapistSchedule() {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog Riprogramma a slot */}
+   
       <Dialog open={Boolean(reschedAppt)} onClose={closeReschedule} fullWidth maxWidth="md">
         <DialogTitle>Riprogramma appuntamento</DialogTitle>
         <DialogContent dividers>
@@ -395,7 +393,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
 
   return (
     <>
-      {/* colonna orario */}
+      
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', pr: 1 }}>
         <Typography variant="body2">{label}</Typography>
       </Box>
@@ -403,7 +401,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
       {days.map((d) => {
         const key = slotKey(d, hour);
         const appt = slotMap.get(key);
-        const cellState = statusToCell(appt?.status); // 'accepted' | 'pending' | 'free'
+        const cellState = statusToCell(appt?.status); 
 
         const stateSx =
           cellState === 'accepted'
@@ -420,7 +418,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
             variant="outlined"
             sx={{
               p: 1,
-              pr: isOnlineAccepted ? 5 : 1, // spazio a destra per l'icona
+              pr: isOnlineAccepted ? 5 : 1, 
               minHeight: 56,
               display: 'flex',
               alignItems: 'center',
@@ -443,7 +441,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
                   </Typography>
                 </Stack>
 
-                {/* Azione a destra: SOLO riprogramma */}
+                
                 <Stack direction="row" spacing={0.5}>
                   <Tooltip title="Riprogramma su altro slot">
                     <span>
@@ -463,7 +461,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
                   </Tooltip>
                 </Stack>
 
-                {/* Icona laptop in basso a destra (piccola, b/n) */}
+                
                 {isOnlineAccepted && (
                   <Tooltip title="Apri visita online">
                     <IconButton
@@ -473,7 +471,7 @@ function SlotRow({ hour, days, slotMap, loading, actionBusy, onReschedule, onOpe
                         position: 'absolute',
                         right: 9,
                         bottom: 5,
-                        color: 'common.white',    // b/n (bianco)
+                        color: 'common.white',    
                       }}
                       aria-label="Apri link visita online"
                     >
@@ -499,7 +497,7 @@ function ReschedRow({ hour, days, avail, onPick }) {
 
   return (
     <>
-      {/* colonna orario */}
+     
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', pr: 1 }}>
         <Typography variant="body2">{label}</Typography>
       </Box>

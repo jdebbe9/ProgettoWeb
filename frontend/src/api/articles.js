@@ -6,7 +6,6 @@ export async function listArticles(params = {}) {
   return data?.items || [];
 }
 
-// Articoli pubblicati (visibili al paziente)
 export async function listPublishedArticles(params = {}) {
   const { data } = await api.get('/articles/public', { params });
   return data?.items || [];

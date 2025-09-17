@@ -11,7 +11,7 @@ export async function createDiary(entry) {
   return data
 }
 
-// CORRETTO: usa `api.patch` invece di `api.put`
+
 export async function updateDiary(id, entry) {
   const { data } = await api.patch(`/diary/${id}`, entry)
   return data

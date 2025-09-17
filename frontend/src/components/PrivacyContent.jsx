@@ -6,7 +6,7 @@ export default function PrivacyContent() {
     <Box sx={{ '& p': { mb: 2 } }}>
       <Typography variant="h6" gutterBottom>Informativa Privacy</Typography>
 
-      {/* ⬇️ Sostituisci i paragrafi seguenti con il TUO testo già usato in /privacy */}
+    
       <Typography variant="body2" component="div">
         <p>
            Ai sensi del Regolamento (UE) 2016/679 (“GDPR”), questa informativa descrive
@@ -32,7 +32,7 @@ export default function PrivacyContent() {
           quanto necessario per gli scopi didattici. 
         </p>
       </Typography>
-      {/* ⬆️ FINE segnaposto */}
+     
     </Box>
   );
 }

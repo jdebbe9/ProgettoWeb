@@ -10,12 +10,12 @@ const QAItemSchema = new mongoose.Schema(
 
 const QuestionnaireResponseSchema = new mongoose.Schema(
   {
-    // un solo questionario per utente
+   
     user:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-    // array di Q/A coerente con il controller
+  
     responses: { type: [QAItemSchema], required: true }
   },
-  { timestamps: true }  // usa createdAt/updatedAt invece di submittedAt
+  { timestamps: true } 
 );
 
 

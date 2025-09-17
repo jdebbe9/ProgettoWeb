@@ -9,7 +9,7 @@ export default function App() {
   const { user } = useAuth()
   const { pathname } = useLocation()
 
-  // Se l'utente è loggato e va a /, portalo nella dashboard corretta
+
   if (user && pathname === '/') {
     const target = user.role === 'therapist' ? '/therapist/dashboard' : '/dashboard'
     return <Navigate to={target} replace />

@@ -22,13 +22,12 @@ export default function Patients() {
   const [error, setError]     = useState('');
   const [items, setItems]     = useState([]);
 
-  // UI state
+  
   const [q, setQ]                         = useState('');
   const [onlyNoQuestionnaire, setOnlyNoQuestionnaire] = useState(false);
-  const [orderBy, setOrderBy]             = useState('name');   // 'name' | 'createdAt' | 'email'
-  const [order, setOrder]                 = useState('asc');    // 'asc' | 'desc'
+  const [orderBy, setOrderBy]             = useState('name');   
+  const [order, setOrder]                 = useState('asc');   
 
-  // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
@@ -47,7 +46,7 @@ export default function Patients() {
 
   useEffect(() => { load(); }, [load]);
 
-  // KPI
+ 
   const kpi = useMemo(() => {
     const total = items.length;
     const noQuest = items.filter(p => !p?.questionnaireDone).length;
@@ -60,7 +59,7 @@ export default function Patients() {
     return { total, noQuest, newLast7 };
   }, [items]);
 
-  // Filter + sort
+ 
   const filtered = useMemo(() => {
     let arr = items;
 
@@ -83,7 +82,7 @@ export default function Patients() {
         va = norm(fullName(a)); vb = norm(fullName(b));
       } else if (orderBy === 'email') {
         va = norm(a?.email || ''); vb = norm(b?.email || '');
-      } else { // createdAt
+      } else { 
         va = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
         vb = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
       }
@@ -122,7 +121,7 @@ export default function Patients() {
       <Typography variant="h5" sx={{ mb: 2 }}>Pazienti</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* KPI */}
+    
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 220 }}>
           <Typography variant="overline" color="text.secondary">Totale</Typography>
@@ -141,7 +140,7 @@ export default function Patients() {
       {/* Toolbar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Grid container alignItems="center" spacing={2}>
-          {/* Sinistra: filtri */}
+          
           <Grid item xs>
             <Stack
               direction={{ xs: 'column', md: 'row' }}

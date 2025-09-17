@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { submitQuestionnaire } from '../api/questionnaire';
 import { useAuth } from '../context/AuthContext';
 
-// Nuove 6 domande (manteniamo gli stessi id q1..q6; aggiunto minRows per leggibilità)
+
 const questions = [
   {
     id: 'q1',
@@ -43,12 +43,12 @@ const questions = [
 
 export default function Questionnaire() {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth(); // per aggiornare questionnaireDone
+  const { user, setUser } = useAuth();
   const [answers, setAnswers] = useState({});
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Se già completato → vai direttamente agli appuntamenti
+
   useEffect(() => {
     if (user && user.questionnaireDone) {
       navigate('/appointments', { replace: true });
@@ -74,7 +74,7 @@ export default function Questionnaire() {
       return;
     }
 
-    // Invio come nel tuo backend: salviamo testo domanda + risposta
+    
     const responses = questions.map(q => ({
       question: q.text,
       answer: (answers[q.id] || '').trim(),
@@ -83,13 +83,13 @@ export default function Questionnaire() {
     try {
       await submitQuestionnaire({ responses });
 
-      // marca l'utente come con questionario completato
+  
       setUser(prev => (prev ? { ...prev, questionnaireDone: true } : prev));
 
-      // fallback per toast in Appointments
+    
       localStorage.setItem('pc_qc_toast', '1');
 
-      // redirect agli appuntamenti + stato per l'alert
+    
       navigate('/appointments', {
         replace: true,
         state: { questionnaireJustCompleted: true },

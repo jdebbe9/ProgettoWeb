@@ -48,16 +48,16 @@ Lavoro su obiettivi concordati insieme e su percorsi personalizzati.`;
     <Box className="container" sx={{ mt: 2, maxWidth: 1100, mx: 'auto' }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Area Personale</Typography>
 
-      {/* Layout 3:1 fisso con CSS Grid */}
+    
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' },
-          gap: 2,                 // = theme.spacing(2) = 16px
-          alignItems: 'stretch',  // altezze uguali
+          gap: 2,                 
+          alignItems: 'stretch',  
         }}
       >
-        {/* SX (3 parti) */}
+      
         <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar sx={{ width: 64, height: 64 }}>{initials}</Avatar>
@@ -75,7 +75,7 @@ Lavoro su obiettivi concordati insieme e su percorsi personalizzati.`;
             {bio}
           </Typography>
 
-          {/* Dati in griglia: Nome/Cognome, poi Data di nascita, poi Email */}
+          
           <Box
             sx={{
               mt: 2,
@@ -98,23 +98,23 @@ Lavoro su obiettivi concordati insieme e su percorsi personalizzati.`;
           </Box>
         </Paper>
 
-        {/* DX (1 parte) */}
+        
         <Paper variant="outlined" sx={{ p: 1.7, height: '100%' }}>
           
 
-          {/* Studio */}
+          
           <Section title="Studio">
             <Row icon={<BusinessIcon />} label="Nome"     value={studio?.businessName || 'Le radici di sè'} />
             <Row icon={<PlaceIcon />}    label="Indirizzo" value={studio?.address || 'Via Esempio 123, Bari'} />
             <Row icon={<PhoneIcon />}    label="Telefono"  value={studio?.phone || '+39 000 000 0000'} />
           </Section>
 
-          {/* Visite */}
+        
           <Section title="Visite">
             <Typography variant="body2" color="text.secondary">In studio/Online</Typography>
           </Section>
 
-          {/* Orari di servizio */}
+       
           <Section title="Orari di servizio">
             <Stack spacing={0.5}>
               {hours
@@ -134,7 +134,7 @@ Lavoro su obiettivi concordati insieme e su percorsi personalizzati.`;
   );
 }
 
-/* === piccoli componenti di presentazione === */
+
 function Info({ label, value }) {
   return (
     <Box>

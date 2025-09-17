@@ -9,14 +9,10 @@ function escRx(s = '') {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * GET /api/therapists/patients
- * Elenco pazienti (solo per terapeuti).
- * Supporta ?page=1&limit=20
- */
+
 exports.getAllPatients = async (req, res) => {
   try {
-    // Difesa-in-profondità (comunque usa requireRole('therapist') nelle route)
+   
     if (req.user?.role !== 'therapist') {
       return res.status(403).json({ message: 'Permesso negato' });
     }
@@ -27,7 +23,7 @@ exports.getAllPatients = async (req, res) => {
 
     const [patients, total] = await Promise.all([
       User.find({ role: 'patient' })
-        .select('-passwordHash -refreshTokenHash') // non esporre segreti
+        .select('-passwordHash -refreshTokenHash')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -47,12 +43,7 @@ exports.getAllPatients = async (req, res) => {
   }
 };
 
-/**
- * GET /api/therapists/patients (ricerca) oppure /api/therapists/patients/search
- * Ricerca pazienti per prefisso su name/surname e anche su "name surname".
- * Parametri: ?q=Vito&limit=10
- * Solo terapeuta.
- */
+
 exports.searchPatients = async (req, res) => {
   try {
     if (req.user?.role !== 'therapist') {
@@ -66,21 +57,21 @@ exports.searchPatients = async (req, res) => {
       return res.json({ items: [] });
     }
 
-    const rx = new RegExp('^' + escRx(q), 'i');        // prefisso su singolo campo
-    const rxStr = '^' + escRx(q);                      // per $regexMatch in $expr
+    const rx = new RegExp('^' + escRx(q), 'i');       
+    const rxStr = '^' + escRx(q);                      
 
     const where = {
       role: 'patient',
       $or: [
         { name: rx },
         { surname: rx },
-        // Prefisso su "name surname" (es. "Vito Ro")
+        
         { $expr: { $regexMatch: { input: { $concat: ['$name', ' ', '$surname'] }, regex: rxStr, options: 'i' } } }
       ]
     };
 
     const items = await User.find(where)
-      .select('_id name surname') // NO email
+      .select('_id name surname') 
       .sort({ name: 1, surname: 1 })
       .limit(limit)
       .lean();
@@ -92,11 +83,7 @@ exports.searchPatients = async (req, res) => {
   }
 };
 
-/**
- * GET /api/therapists/patients/:id
- * Dettagli di un paziente: profilo, diario (SOLO condiviso), questionario, appuntamenti.
- * Solo terapeuta; valida ObjectId; dati minimizzati.
- */
+
 exports.getPatientDetails = async (req, res) => {
   try {
     if (req.user?.role !== 'therapist') {
@@ -114,7 +101,7 @@ exports.getPatientDetails = async (req, res) => {
     }
 
     const [diary, questionnaire, appointments] = await Promise.all([
-      // ⬇️ SOLO voci condivise; include anche quelle storiche senza 'shared'
+   
       DiaryEntry.find({
         user: userId,
         $or: [{ shared: true }, { shared: { $exists: false } }]

@@ -64,7 +64,7 @@ function toProfileStateFromServer(data) {
   };
 }
 
-/* ---- “InfoField”: testo in view, TextField in edit, stessa larghezza ---- */
+
 function InfoField({ label, value, onChange, type = 'text', editMode = false, placeholder }) {
   return (
     <Box>
@@ -124,7 +124,6 @@ function InfoPassword({ label, value, onChange, editMode }) {
   );
 }
 
-/* --------------- component --------------- */
 export default function Profile() {
   const { setUser } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -285,8 +284,7 @@ export default function Profile() {
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* DATI PERSONALI — layout a 12 colonne con righe simmetriche */}
-      {/* DATI PERSONALI — layout 3 colonne fisse (4/4/4) */}
+     
 <Paper sx={{ p: 3 }}>
   <form onSubmit={onSave}>
     <Box
@@ -296,10 +294,7 @@ export default function Profile() {
         gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' },
       }}
     >
-      {/* helper per posizionare in colonna 4/4/4 */}
-      {/* col1 = 1..4, col2 = 5..8, col3 = 9..12 */}
-      {/* riga indicata da gridRow per mantenere le colonne anche in edit */}
-      {/* RIGA 1 */}
+      
       <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 1 } }}>
         <InfoField label="NOME" value={profile.name} onChange={(v)=>updateField('name', v)} editMode={editMode} />
       </Box>
@@ -310,17 +305,17 @@ export default function Profile() {
         <InfoField label="DATA DI NASCITA" value={profile.birthDate} onChange={(v)=>updateField('birthDate', v)} type="date" editMode={editMode} />
       </Box>
 
-      {/* RIGA 2 */}
+     
       <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 2 } }}>
         <InfoField label="EMAIL" value={profile.email} onChange={(v)=>updateField('email', v)} editMode={editMode} />
       </Box>
       <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 2 } }}>
         <InfoPassword label="PASSWORD" value={password} onChange={setPassword} editMode={editMode} />
       </Box>
-      {/* spacer per tenere la colonna 3 vuota ma allineata */}
+      
       <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 2 }} />
 
-      {/* RIGA 3 */}
+     
       <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 3 } }}>
         <InfoField label="CITTÀ" value={profile.city} onChange={(v)=>updateField('city', v)} editMode={editMode} />
       </Box>
@@ -329,7 +324,7 @@ export default function Profile() {
       </Box>
       <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 3 }} />
 
-      {/* RIGA 4 */}
+     
       <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 4 } }}>
         <InfoField label="INDIRIZZO (VIA)" value={addrStreet} onChange={setAddrStreet} editMode={editMode} />
       </Box>
@@ -338,7 +333,7 @@ export default function Profile() {
       </Box>
       <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 4 }} />
 
-      {/* Questionario */}
+    
       <Box sx={{ gridColumn: '1 / -1', mt: 1 }}>
         {qDone ? (
           <Alert severity="success" variant="standard" sx={{ borderRadius: 2 }}>
@@ -352,7 +347,7 @@ export default function Profile() {
       </Box>
     </Box>
 
-    {/* AZIONI — solo in editMode, in basso a destra */}
+   
     {editMode && (
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
         <Button type="submit" variant="contained" disabled={saving}>
@@ -363,7 +358,7 @@ export default function Profile() {
   </form>
 </Paper>
 
-      {/* Contatti di emergenza */}
+      
 <Paper sx={{ p: 3, mt: 4 }}>
   <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>
     Contatti di emergenza
@@ -404,7 +399,7 @@ export default function Profile() {
           />
         </Box>
 
-        {/* RIGA 2: EMAIL (tutta riga) */}
+        
         <Box sx={{ gridColumn: '1 / -1', gridRow: { md: 2 } }}>
           <InfoField
             label="EMAIL (FACOLTATIVA)"
@@ -416,7 +411,7 @@ export default function Profile() {
 
         
 
-        {/* RIGA 4: Azioni (solo in modifica) */}
+        
         {editMode && (
           <Box
             sx={{

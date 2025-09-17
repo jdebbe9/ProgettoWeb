@@ -11,8 +11,8 @@ export function useAuth() {
   return ctx;
 }
 
-export { AuthContext };      // named export
-export default AuthContext;   // default export (se mai ti serve)
+export { AuthContext };      
+export default AuthContext;   
 
 
 

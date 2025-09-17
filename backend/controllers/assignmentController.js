@@ -1,12 +1,12 @@
 // backend/controllers/assignmentController.js
 const Assignment = require('../models/Assignment');
 
-// (opzionali per validazione proprietà/ownership dell'item)
+
 let Article, Book;
 try { Article = require('../models/Article'); } catch (_) {}
 try { Book = require('../models/Book'); } catch (_) {}
 
-// Notifiche (tolleranti: usiamo ciò che c'è senza rompere in assenza)
+
 let notifyUser = null, Notification = null, emitToUser = null;
 try { ({ notifyUser } = require('../services/notify')); } catch (_) {}
 try { Notification = require('../models/Notification'); } catch (_) {}
@@ -16,10 +16,10 @@ function uid(req) { return req?.user?._id || req?.user?.id; }
 function isTherapist(req){ return req?.user?.role === 'therapist'; }
 function isPatient(req){ return req?.user?.role === 'patient'; }
 
-// campi comuni + campi utili ai libri (per link acquisto)
+
 const ITEM_FIELDS = 'title author updatedAt status purchaseUrl url link';
 
-// GET /api/assignments
+
 exports.list = async (req,res,next) => {
   try {
     const me = uid(req);
@@ -34,7 +34,7 @@ exports.list = async (req,res,next) => {
   } catch (e) { next(e); }
 };
 
-// POST /api/assignments (solo terapeuta)
+
 exports.create = async (req,res,next) => {
   try {
     const me = uid(req);
@@ -45,13 +45,13 @@ exports.create = async (req,res,next) => {
     if (!isTherapist(req)) {
       return res.status(403).json({ message: 'Non autorizzato' });
     }
-    // Valida itemType supportati
+  
     const allowedTypes = ['Article', 'Book'];
     if (!allowedTypes.includes(itemType)) {
       return res.status(400).json({ message: 'itemType non valido' });
     }
 
-    // Verifica esistenza item e (se possibile) ownership del terapeuta
+    
     let itemDoc = null;
     if (itemType === 'Article' && Article) {
       itemDoc = await Article.findById(itemId).select('title author status');
@@ -67,7 +67,7 @@ exports.create = async (req,res,next) => {
       }
     }
 
-    // 🔒 Unicità: stessa coppia (patient,itemType,item) non può esistere più volte
+   
     const existing = await Assignment.findOne({ patient: patientId, itemType, item: itemId }).lean();
     if (existing) {
       return res.status(409).json({
@@ -87,7 +87,7 @@ exports.create = async (req,res,next) => {
     const pop = await Assignment.findById(doc._id)
       .populate({ path:'item', select: ITEM_FIELDS });
 
-    // Notifica al paziente (tollerante agli ambienti incompleti)
+    
     (async () => {
       try {
         const notifPayload = {
@@ -133,7 +133,7 @@ exports.create = async (req,res,next) => {
 
     res.status(201).json(pop);
   } catch (e) {
-    // Gestione race: indice unico può lanciare E11000
+   
     if (e && e.code === 11000) {
       return res.status(409).json({ message: 'Questo materiale è già stato assegnato a questo paziente.' });
     }
@@ -141,7 +141,6 @@ exports.create = async (req,res,next) => {
   }
 };
 
-// PATCH /api/assignments/:id (terapeuta proprietario o paziente destinatario)
 exports.update = async (req,res,next) => {
   try {
     const me = uid(req);
@@ -164,7 +163,7 @@ exports.update = async (req,res,next) => {
   } catch (e) { next(e); }
 };
 
-// DELETE /api/assignments/:id (solo terapeuta proprietario)
+
 exports.remove = async (req,res,next) => {
   try {
     const me = uid(req);

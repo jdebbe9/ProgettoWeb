@@ -4,7 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Grid, Typography, Chip, CircularProgress, Box
 } from '@mui/material'
-import { me as fetchMe } from '../api/auth' // usa la tua API /auth/me con axios + JWT
+import { me as fetchMe } from '../api/auth'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -12,7 +12,7 @@ function formatDate(iso) {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
 }
 
-// Rileva "consenso privacy accettato" in vari schemi di backend
+
 function isPrivacyAccepted(profile) {
   const p = profile || {}
   return Boolean(
@@ -28,17 +28,16 @@ export default function ProfileDialog({ open, onClose, user }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
 
-  // All'apertura, prova a caricare il profilo completo (per avere surname/birthDate/consent ecc.)
   useEffect(() => {
     let active = true
     async function load() {
       if (!open) return
       setLoading(true); setError('')
       try {
-        const data = await fetchMe() // deve restituire il profilo completo
+        const data = await fetchMe() 
         if (active) setProfile(data)
       } catch (e) {
-        // fallback: usa quanto c'è in user
+        
         if (active) {
           setProfile(user || null)
           setError(e?.response?.data?.message || e?.message || 'Impossibile caricare il profilo completo.')
@@ -63,7 +62,7 @@ export default function ProfileDialog({ open, onClose, user }) {
       label: 'Consenso privacy',
       value: isPrivacyAccepted(p) ? 'Acconsentito' : 'Non acconsentito'
     },
-    // opzionali: mostrali solo se esistono
+   
     p.isMinor !== undefined ? { label: 'Minore', value: p.isMinor ? 'Sì' : 'No' } : null,
     p.parentFirstName ? { label: 'Nome genitore', value: p.parentFirstName } : null,
     p.parentLastName ? { label: 'Cognome genitore', value: p.parentLastName } : null,
@@ -100,7 +99,7 @@ export default function ProfileDialog({ open, onClose, user }) {
               ))}
             </Grid>
 
-            {/* Tag riassuntivo per questionario (niente ruolo) */}
+           
             {p.questionnaireDone !== undefined && (
               <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <Chip

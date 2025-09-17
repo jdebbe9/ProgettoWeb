@@ -16,9 +16,9 @@ import Home from '../pages/Home'
 import Profile from '../pages/Profile'
 import Patients from '../pages/therapist/Patients';
 import PatientDetails from '../pages/therapist/PatientDetails';
-import ArticlePublic from '../pages/ArticlePublic'; // <-- percorso corretto
+import ArticlePublic from '../pages/ArticlePublic'; 
 
-// ⬇️ percorso CORRETTO (una cartella sopra)
+
 import TherapistSchedule from '../pages/therapist/TherapistSchedule'
 import TherapistProfile from '../pages/therapist/TherapistProfile';
 import ScheduleRequests from '../pages/therapist/ScheduleRequests';
@@ -42,7 +42,7 @@ export const router = createBrowserRouter([
       { path: 'privacy', element: <Privacy /> },
       
 
-      // area utente (paziente)
+      
       {
         element: <ProtectedRoute roles={['patient']} />,
         children: [
@@ -54,12 +54,12 @@ export const router = createBrowserRouter([
           { path: 'materials',     element: <Materials /> },
           { path: 'goals',         element: <Goals /> },
           
-          // lettura articolo pubblicato (paziente)
+          
           { path: 'articles/:id',  element: <ArticlePublic /> },
         ]
       },
 
-      // area terapeuta
+   
       {
         path: 'therapist',
         element: <ProtectedRoute roles={['therapist']} />,

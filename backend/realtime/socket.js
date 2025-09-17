@@ -37,7 +37,7 @@ function joinRooms(socket, rawId){
   socket.join(`user:${uid}`);
   socket.data.userId = uid;
   log('[socket][server] joined rooms:', uid, `user:${uid}`);
-  pushUnreadCount(uid); // 👈 manda subito il badge
+  pushUnreadCount(uid); 
 }
 
 function tryJoinFromToken(socket, token){
@@ -68,12 +68,12 @@ function initSocket(httpServer){
 
     if (!tryJoinFromToken(socket, t) && hsUid) joinRooms(socket, hsUid);
 
-    // evento esplicito
+   
     socket.on('auth', ({ token, userId } = {}) => {
       if (!tryJoinFromToken(socket, token) && userId) joinRooms(socket, userId);
     });
 
-    // compat
+   
     socket.on('join', (userId) => joinRooms(socket, userId));
 
     socket.on('disconnect', (reason) => log('[socket] disconnect', socket.id, reason));

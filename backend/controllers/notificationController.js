@@ -7,7 +7,7 @@ const { emitToUser } = require('../realtime/socket');
 function log(...a) { if (process.env.NODE_ENV !== 'production') console.log(...a); }
 function warn(...a) { if (process.env.NODE_ENV !== 'production') console.warn(...a); }
 
-/** Estrae id/ruolo in modo robusto da qualunque middleware tu stia usando */
+
 async function getAuth(req) {
   let id =
     (req?.user && (req.user._id || req.user.id)) ||
@@ -27,12 +27,12 @@ async function getAuth(req) {
   return { id, role };
 }
 
-/** Match sia schema con userId che schema legacy con user */
+
 function userMatch(userId) {
   return { $or: [{ userId: userId }, { user: userId }] };
 }
 
-/** Condizione “unread” robusta (copre read/isRead/readAt assenti) */
+
 function unreadConditionFor(userId) {
   return {
     ...userMatch(userId),
@@ -44,7 +44,7 @@ function unreadConditionFor(userId) {
   };
 }
 
-/** Calcola e invia via socket il nuovo conteggio */
+
 async function emitUnread(userId) {
   if (!userId) return;
   try {
@@ -55,8 +55,7 @@ async function emitUnread(userId) {
   }
 }
 
-/* ----------------------------- LIST ----------------------------- */
-// GET /api/notifications?limit=20&skip=0
+
 exports.list = async (req, res, next) => {
   try {
     const { id } = await getAuth(req);
@@ -79,8 +78,7 @@ exports.list = async (req, res, next) => {
   }
 };
 
-/* ----------------------- UNREAD COUNT --------------------------- */
-// GET /api/notifications/unread-count
+
 exports.getUnreadCount = async (req, res, next) => {
   try {
     const { id } = await getAuth(req);
@@ -93,8 +91,7 @@ exports.getUnreadCount = async (req, res, next) => {
   }
 };
 
-/* ------------------------- MARK ONE ----------------------------- */
-// PATCH /api/notifications/:id/read
+
 exports.markOneRead = async (req, res, next) => {
   try {
     const { id: myId } = await getAuth(req);
@@ -120,8 +117,6 @@ exports.markOneRead = async (req, res, next) => {
   }
 };
 
-/* ---------------------- MARK ALL READ --------------------------- */
-// POST /api/notifications/mark-all-read
 exports.markAllRead = async (req, res, next) => {
   try {
     const { id: myId } = await getAuth(req);
@@ -139,8 +134,7 @@ exports.markAllRead = async (req, res, next) => {
   }
 };
 
-/* -------------------------- CLEAR ALL --------------------------- */
-// DELETE /api/notifications
+
 exports.clearAll = async (req, res, next) => {
   try {
     const { id: myId } = await getAuth(req);

@@ -18,7 +18,7 @@ function formatDate(ts) {
   return d.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 }
 
-// Fallback di rotta se manca n.link dal backend
+
 function routeFor(notifType, role) {
   const t = String(notifType || '').toUpperCase();
   const isTher = role === 'therapist';
@@ -45,7 +45,7 @@ export default function NotificationsBell() {
   const [loading, setLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
-  // ---- bootstrap: quando l'utente cambia, prendo il conteggio dal server
+  
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -58,32 +58,32 @@ export default function NotificationsBell() {
       .catch(() => {});
   }, [user, authLoading]);
 
-  // ---- realtime via window events (bridgiati dal socket client)
+  
   useEffect(() => {
     if (!user) return;
 
     const onUnread = (e) => {
       const next = Number(e?.detail?.count);
       if (Number.isFinite(next)) {
-        setUnread(next); // prendo il numero "vero" dal server
+        setUnread(next); 
       }
     };
 
     const onNew = (e) => {
       const notif = e?.detail;
-      // Ottimistico: vedo subito il +1
+      
       setUnread((u) => (Number.isFinite(u) ? u + 1 : 1));
       if (menuOpenRef.current && notif) {
         setItems((prev) => [notif, ...prev].slice(0, 20));
       }
-      // Riallineo con il server (sicuro contro raddoppi/ritardi)
+      
       getUnreadCount()
         .then((c) => setUnread(Number(c) || 0))
         .catch(() => {});
     };
 
     const onAppt = () => {
-      // alcuni flussi emettono solo gli eventi appuntamento → rifaccio il count
+     
       getUnreadCount()
         .then((c) => setUnread(Number(c) || 0))
         .catch(() => {});
@@ -100,7 +100,7 @@ export default function NotificationsBell() {
     };
   }, [user]);
 
-  // ---- apertura menu → carico lista e riallineo il badge
+  
   function openMenu(e) {
     setAnchorEl(e.currentTarget);
     menuOpenRef.current = true;
@@ -122,7 +122,7 @@ export default function NotificationsBell() {
     menuOpenRef.current = false;
   }
 
-  // ---- interazioni
+  
   function onItemClick(n) {
     const id = n?._id || n?.id;
     const go = () => {
@@ -142,7 +142,7 @@ export default function NotificationsBell() {
                 : x
             )
           );
-          // prendo il numero reale dal server (così vado sicuro)
+          
           getUnreadCount().then((c) => setUnread(Number(c) || 0)).catch(() => {});
           go();
         });
@@ -154,7 +154,7 @@ export default function NotificationsBell() {
   function onMarkAll() {
   setActionBusy(true);
 
-  // ✅ Ottimistico: segna tutto letto SUBITO in UI
+ 
   setItems(prev =>
     prev.map(n => ({
       ...n,
@@ -165,9 +165,9 @@ export default function NotificationsBell() {
   );
   setUnread(0);
 
-  // Chiamata API (qualsiasi esito) + riallineo con il server
+  
   markAllRead()
-    .catch(() => { /* non blocco: ricarico comunque da server */ })
+    .catch(() => { /*  */ })
     .finally(() => {
       Promise.all([
         getUnreadCount().catch(() => 0),

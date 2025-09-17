@@ -4,11 +4,11 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { LoginPanel } from './Login';
 
 export default function Home() {
-  // ⇣ scegli qui la tua frase (pronta la #8)
+  
   const HEADLINE = 'Le radici di sè.';
   const SUBHEAD  = 'Il tuo spazio riservato per capire, scegliere, ripartire.';
 
-  // punti brevi (opzionali)
+  
   const points = [
     'Appuntamenti online o in studio',
     'Area personale riservata',
@@ -18,7 +18,7 @@ export default function Home() {
   return (
     <Box
       sx={{
-        // più spazio in alto e ai lati
+        
         px: { xs: 2, sm: 4 },
         pt: { xs: 3, sm: 6 },
         pb: { xs: 5, sm: 8 },
@@ -26,7 +26,7 @@ export default function Home() {
     >
       <Box
         sx={{
-          // contenitore più largo, ma spostiamo il blocco testo un filo a sinistra
+          
           maxWidth: 1240,
           mx: 'auto',
           display: 'grid',
@@ -35,12 +35,12 @@ export default function Home() {
           alignItems: 'start',
         }}
       >
-        {/* Colonna sinistra (hero): leggermente più in basso e un filo più a sinistra */}
+        
         <Box
           sx={{
             pr: { md: 4 },
-            mt: { xs: 1, md: 23 },     // ⇠ più in basso
-            ml: { md: -14 },           // ⇠ sposta un po’ a sinistra
+            mt: { xs: 1, md: 23 },     
+            ml: { md: -14 },           
             position: 'relative',
           }}
         >
@@ -75,7 +75,7 @@ export default function Home() {
           </Paper>
         </Box>
 
-        {/* Colonna destra: pannello di login (sticky) */}
+        
         <Stack sx={{ position: 'relative', top: {md: 58 } }}>
           <LoginPanel />
         </Stack>

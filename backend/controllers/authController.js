@@ -12,14 +12,14 @@ if (!ACCESS_SECRET || !REFRESH_SECRET) {
 
 const COOKIE_PATH = '/api/auth/refresh';
 
-// Helpers -------------------------------------------------
+
 const generateAccessToken = (user) =>
   jwt.sign({ userId: user._id.toString(), role: user.role }, ACCESS_SECRET, { expiresIn: '15m' });
 
 const generateRefreshToken = (user) =>
   jwt.sign({ userId: user._id.toString() }, REFRESH_SECRET, { expiresIn: '7d' });
 
-// Imposta sia il vero cookie httpOnly sia il cookie-spia leggibile dal client (non sensibile)
+
 const sendRefreshCookies = (res, token) => {
   const opts = {
     httpOnly: true,
@@ -29,7 +29,7 @@ const sendRefreshCookies = (res, token) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   };
   res.cookie('refreshToken', token, opts);
-  // cookie spia (NON contiene segreti) per evitare chiamate /refresh inutili
+  
   res.cookie('hasRefresh', '1', {
     httpOnly: false,
     secure: opts.secure,
@@ -42,12 +42,12 @@ const sendRefreshCookies = (res, token) => {
 const clearRefreshCookies = (res) => {
   res.clearCookie('refreshToken', { path: COOKIE_PATH });
   res.clearCookie('hasRefresh', { path: COOKIE_PATH });
-  // compat col vecchio path
+ 
   res.clearCookie('refreshToken', { path: '/api/auth' });
   res.clearCookie('hasRefresh', { path: '/api/auth' });
 };
 
-// Dati pubblici utente
+
 const publicUser = (u) => ({
   id: u._id,
   name: u.name,
@@ -55,8 +55,6 @@ const publicUser = (u) => ({
   role: u.role,
   questionnaireDone: u.questionnaireDone,
 });
-
-// Controllers --------------------------------------------
 
 exports.register = async (req, res) => {
   let { name, surname, birthDate, email, password, consent } = req.body;
@@ -148,7 +146,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// POST/GET /api/auth/refresh
+
 exports.refresh = async (req, res) => {
   const token = req.cookies && req.cookies.refreshToken ? req.cookies.refreshToken : null;
   if (!token) {
@@ -207,7 +205,7 @@ exports.logout = async (req, res) => {
   return res.json({ message: 'Logout effettuato' });
 };
 
-// GET /api/auth/me
+
 exports.me = async (req, res) => {
   const u = await User.findById(req.user.id)
     .select(
@@ -243,7 +241,7 @@ exports.me = async (req, res) => {
   });
 };
 
-// PATCH /api/auth/me
+
 exports.updateMe = async (req, res) => {
   const allow = ['name', 'surname', 'birthDate', 'email'];
   const patch = {};

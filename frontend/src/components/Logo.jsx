@@ -1,19 +1,6 @@
 import * as React from 'react';
 
-/**
- * Logo "Le radici di sè" — icona vettoriale (circolare con volto) + wordmark opzionale.
- * Pensato per rendere bene anche a 24–40px.
- *
- * Props:
- * - variant: 'icon' | 'wordmark'  (default: 'wordmark')
- * - size: altezza icona in px (default 40)
- * - strokeWidth: spessore linee (default 1.9 per viewBox 24)
- * - label: testo wordmark (default "Le radici di sè")
- * - labelWeight: peso font (default 600)
- * - labelScale: fattore rispetto all’icona per la dimensione del testo (default 0.9)
- * - color: forza il colore (altrimenti usa currentColor e quindi eredita dal parent)
- * - decorative: se true, nasconde l’icona agli screen reader (utile quando c’è già il testo)
- */
+
 const Logo = React.forwardRef(function Logo(
   {
     variant = 'wordmark',
@@ -48,13 +35,13 @@ const Logo = React.forwardRef(function Logo(
     >
       {!decorative && <title id={titleId}>{label}</title>}
       <g fill="none" {...stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-        {/* Badge circolare */}
+       
         <circle cx="12" cy="12" r="10" />
-        {/* Volto */}
+       
         <circle cx="12" cy="9" r="3.2" />
-        {/* Spalle */}
+        
         <path d="M5.5 19c.7-3 3.9-5 6.5-5s5.8 2 6.5 5" />
-        {/* Groviglio/mente (linea semplice, leggibile a piccole dimensioni) */}
+        
         <path d="M10.2 8.6c1-.8 2.6-.6 3.4.3.8.9.7 2.3-.3 3.1-.9.7-2.2.7-3.1 0-.6-.5-.6-1.6 0-2.3" />
       </g>
     </svg>
@@ -62,7 +49,6 @@ const Logo = React.forwardRef(function Logo(
 
   if (variant === 'icon') return Icon;
 
-  // Variante wordmark: l’icona diventa decorativa (screen reader leggono il testo)
   return (
     <span
       style={{
@@ -70,7 +56,7 @@ const Logo = React.forwardRef(function Logo(
         alignItems: 'center',
         gap: 10,
         lineHeight: 1,
-        color: color || 'inherit', // eredita dal parent (es. bianco in AppBar scura)
+        color: color || 'inherit',
         ...style
       }}
     >

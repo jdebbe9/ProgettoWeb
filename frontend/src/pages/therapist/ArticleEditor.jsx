@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { createArticle, getArticle, updateArticle } from '../../api/articles';
 
 export default function ArticleEditor() {
-  const { id } = useParams(); // 'new' oppure ObjectId
+  const { id } = useParams(); 
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
 

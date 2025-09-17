@@ -25,14 +25,14 @@ export default function Footer() {
       }}
     >
       <Container sx={{ py: { xs: 3, sm: 5 } }}>
-        {/* Tre colonne sulla stessa riga */}
+       
         <Grid
           container
           columnSpacing={{ xs: 2, sm: 4, md: 26 }}
           rowSpacing={{ xs: 3, md: 2 }}
           alignItems="flex-start"
         >
-          {/* Colonna 1: Studio */}
+          
           <Grid item xs={12} md={4}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
               Le radici di sè
@@ -71,7 +71,7 @@ export default function Footer() {
             </Stack>
           </Grid>
 
-          {/* Colonna 2: Legale */}
+          
           <Grid item xs={12} md={4} mt={4}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1, color: 'primary.main' }}>
               Legale
@@ -83,7 +83,7 @@ export default function Footer() {
             </Stack>
           </Grid>
 
-          {/* Colonna 3: Social */}
+          
           <Grid item xs={12} md={4} mt={4}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 0.5, color: 'primary.main' }}>
               Social
@@ -123,7 +123,7 @@ export default function Footer() {
           </Grid>
         </Grid>
 
-        {/* P.IVA + ALERT fuori dalla Grid, così l'alert riempie tutta la larghezza del Container */}
+        
         <Box sx={{ mt: 2 }}>
           <Typography variant="body2" color="text.secondary">
             P.IVA: IT01234567890 &nbsp;•&nbsp; Informativa telemedicina / consenso informato disponibile su richiesta.
@@ -135,14 +135,14 @@ export default function Footer() {
               mt: 1.5,
               width: '100%',
               display: 'flex',
-              flexWrap: 'nowrap',        // mai andare a capo nel flex
-              overflowX: 'auto',         // se non basta lo spazio, scroll orizzontale
-              scrollbarWidth: 'none',    // nascondi scrollbar (Firefox)
-              '&::-webkit-scrollbar': { display: 'none' }, // nascondi scrollbar (WebKit)
+              flexWrap: 'nowrap',        
+              overflowX: 'auto',         
+              scrollbarWidth: 'none',    
+              '&::-webkit-scrollbar': { display: 'none' }, 
               '& .MuiAlert-icon': { mr: 1.5, flexShrink: 0 },
               '& .MuiAlert-message': {
-                whiteSpace: 'nowrap',    // una sola riga
-                flexShrink: 0            // non comprimere il testo
+                whiteSpace: 'nowrap',    
+                flexShrink: 0            
               }
             }}
           >

@@ -22,7 +22,7 @@ export function getAccessToken() { return accessToken; }
 const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
-  timeout: 15000,          // ⬅️ aggiunto: 15s hard cap
+  timeout: 15000,         
 });
 
 const bare = axios.create({

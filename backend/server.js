@@ -30,7 +30,7 @@ const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
-/* Sicurezza & parsing */
+
 app.use(helmet());
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -61,15 +61,15 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-/* Static uploads */
+
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 app.use('/uploads', express.static(uploadsDir));
 
-/* Healthcheck */
+
 app.get('/api/health', (_req, res) => res.json({ status: 'OK' }));
 
-/* Endpoints */
+
 app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/diary', diaryRoutes);
@@ -87,11 +87,11 @@ app.use('/api/therapist/notes', require('./routes/therapistNotesRoutes'));
 
 
 
-/* 404 & error handler */
+
 app.use(notFound);
 app.use(errorHandler);
 
-/* Seed terapeuta unico */
+
 async function ensureTherapistAccount() {
   try {
     const email = process.env.THERAPIST_EMAIL;
@@ -151,7 +151,7 @@ async function ensureTherapistAccount() {
   }
 }
 
-/* Avvio */
+
 (async () => {
   try {
     await connectDB();

@@ -5,11 +5,11 @@ const User = require('../models/User');
 const { notifyUser, getDisplayName } = require('../services/notify');
 const { emitToUser } = require('../realtime/socket');
 
-/* ---- helper ---- */
+
 function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0); }
 function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999); }
 
-/* ---- helper: recupera id e ruolo, qualunque sia il middleware ---- */
+
 async function getAuth(req) {
   const id =
     (req?.user && (req.user._id || req.user.id)) ||
@@ -29,7 +29,7 @@ async function getAuth(req) {
   return { id, role, isTherapist: role === 'therapist', isPatient: role === 'patient' };
 }
 
-/* ---- terapeuta unico risolto lato server (ignora input client) ---- */
+
 async function resolveTherapistId() {
   if (process.env.THERAPIST_ID) return process.env.THERAPIST_ID;
   if (process.env.THERAPIST_EMAIL) {
@@ -40,7 +40,7 @@ async function resolveTherapistId() {
   return t ? t._id : null;
 }
 
-/* ------------------------------- LIST ------------------------------- */
+
 exports.list = async (req, res, next) => {
   try {
     const { id: myId, isTherapist } = await getAuth(req);
@@ -62,7 +62,7 @@ exports.list = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* ------------------------------ CREATE ------------------------------ */
+
 exports.create = async (req, res, next) => {
   try {
     const { id: patientId, isPatient } = await getAuth(req);
@@ -77,18 +77,18 @@ exports.create = async (req, res, next) => {
       return res.status(400).json({ message: 'Data non valida.' });
     }
 
-    // Preavviso: almeno 1 giorno (prenotabile da domani in poi)
+   
     const now = new Date();
     const tomorrow0 = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     if (when < tomorrow0) {
       return res.status(400).json({ message: 'Serve almeno 1 giorno di preavviso per prenotare.' });
     }
 
-    // terapeuta deciso dal server
+   
     const therapistId = await resolveTherapistId();
     if (!therapistId) return res.status(500).json({ message: 'Terapeuta non configurato' });
 
-    // Un solo appuntamento al giorno per paziente (pending/accepted)
+   
     const sod = startOfDay(when), eod = endOfDay(when);
     const already = await Appointment.findOne({
       patient: patientId,
@@ -99,7 +99,7 @@ exports.create = async (req, res, next) => {
       return res.status(400).json({ message: 'Hai già una prenotazione per questo giorno.' });
     }
 
-    // Slot libero per il terapeuta (pending/accepted/rescheduled occupano lo slot)
+    
     const sameSlot = await Appointment.findOne({
       therapist: therapistId,
       date: when,
@@ -122,7 +122,7 @@ exports.create = async (req, res, next) => {
       createdBy: patientId
     });
 
-    // Populate tramite query
+   
     const populated = await Appointment.findById(doc._id)
       .populate('therapist', 'name email')
       .populate('patient', 'name email');
@@ -137,9 +137,9 @@ exports.create = async (req, res, next) => {
       });
     }
 
-    // 🔔 Notifica terapeuta
+    
     try {
-      const patientName = await getDisplayName(patientId); // (manteniamo lo stesso helper usato nel progetto)
+      const patientName = await getDisplayName(patientId); 
       await notifyUser(therapistId, {
         type: 'APPT_REQUESTED',
         title: 'Nuova richiesta di appuntamento',
@@ -152,7 +152,7 @@ exports.create = async (req, res, next) => {
       }
     }
 
-    // 🔄 Realtime
+    
     emitToUser(therapistId, 'appointment:created', { _id: doc._id });
     emitToUser(patientId,   'appointment:created', { _id: doc._id });
 
@@ -160,12 +160,7 @@ exports.create = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* ------------------------------ UPDATE ------------------------------ */
-/* Solo terapeuta: può cambiare status e/o data e/o modalità online.
-   Vincoli:
-   - Se viene cambiata la data → lo slot dev’essere libero per il terapeuta (escluso l’appuntamento stesso).
-   - videoLink valido (http/https) se isOnline=true.
-*/
+
 exports.update = async (req, res, next) => {
   try {
     const { id: myId, isTherapist } = await getAuth(req);
@@ -197,7 +192,7 @@ exports.update = async (req, res, next) => {
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'isOnline')) {
       patch.isOnline = !!req.body.isOnline;
-      if (!patch.isOnline) patch.videoLink = ''; // se offline, azzera link
+      if (!patch.isOnline) patch.videoLink = ''; 
     }
     if (Object.prototype.hasOwnProperty.call(req.body, 'videoLink')) {
       const link = String(req.body.videoLink || '').trim();
@@ -211,7 +206,7 @@ exports.update = async (req, res, next) => {
       return res.status(400).json({ message: 'Nessuna modifica richiesta.' });
     }
 
-    // Leggi prima per conoscere valori precedenti
+    
     const appt = await Appointment.findOne({ _id: id, therapist: myId });
     if (!appt) return res.status(404).json({ message: 'Appuntamento non trovato' });
 
@@ -219,7 +214,7 @@ exports.update = async (req, res, next) => {
     const prevDate = appt.date;
     const patientId = appt.patient;
 
-    // Se cambio data → verifica slot libero per il terapeuta
+    
     if (patch.date && (!prevDate || patch.date.getTime() !== prevDate.getTime())) {
       const conflict = await Appointment.findOne({
         _id: { $ne: appt._id },
@@ -232,12 +227,12 @@ exports.update = async (req, res, next) => {
       }
     }
 
-    // Se vado online, richiedi link (se non già presente)
+    
     if (patch.isOnline && !(patch.videoLink || appt.videoLink)) {
       return res.status(400).json({ message: 'Per una visita online è necessario fornire un link.' });
     }
 
-    // Applica patch e salva
+  
     if (patch.status) appt.status = patch.status;
     if (patch.date)   appt.date   = patch.date;
     if (Object.prototype.hasOwnProperty.call(patch, 'isOnline')) appt.isOnline = patch.isOnline;
@@ -245,9 +240,9 @@ exports.update = async (req, res, next) => {
 
     await appt.save();
 
-    // 🔔 Notifiche al paziente
+    
     try {
-      // Cambiamento di stato
+      
       if (patch.status && patch.status !== prevStatus) {
         if (patch.status === 'accepted') {
           await notifyUser(patientId, {
@@ -280,7 +275,7 @@ exports.update = async (req, res, next) => {
           });
         }
       } else if (patch.date && prevDate && appt.date.getTime() !== prevDate.getTime()) {
-        // Cambio data senza status esplicito ⇒ invia comunque notifica di riprogrammazione
+        
         await notifyUser(patientId, {
           type: 'APPT_RESCHEDULED',
           title: 'Appuntamento riprogrammato',
@@ -289,7 +284,7 @@ exports.update = async (req, res, next) => {
         });
       }
 
-      // Dettagli online: se è online e c'è (nuovo) link, invia notifica dedicata
+      
       if ((Object.prototype.hasOwnProperty.call(patch, 'isOnline') || Object.prototype.hasOwnProperty.call(patch, 'videoLink')) && appt.isOnline && appt.videoLink) {
         await notifyUser(patientId, {
           type: 'APPT_ONLINE_LINK',
@@ -304,7 +299,7 @@ exports.update = async (req, res, next) => {
       }
     }
 
-    // 🔄 Realtime: paziente + terapeuta
+    
     emitToUser(patientId, 'appointment:updated', { _id: appt._id });
     emitToUser(myId,      'appointment:updated', { _id: appt._id });
 
@@ -312,7 +307,7 @@ exports.update = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-/* ------------------------------ REMOVE ------------------------------ */
+
 exports.remove = async (req, res, next) => {
   try {
     const { id: myId, isTherapist } = await getAuth(req);
@@ -326,7 +321,7 @@ exports.remove = async (req, res, next) => {
     const deleted = await Appointment.findOneAndDelete(filter);
     if (!deleted) return res.status(404).json({ message: 'Appuntamento non trovato o non autorizzato' });
 
-    // 🔔 Notifiche: chi cancella → avvisa l'altra parte
+    
     try {
       if (isTherapist) {
         await notifyUser(deleted.patient, {
@@ -350,7 +345,7 @@ exports.remove = async (req, res, next) => {
       }
     }
 
-    // 🔄 Realtime
+  
     emitToUser(deleted.patient,   'appointment:deleted', { _id: deleted._id });
     emitToUser(deleted.therapist, 'appointment:deleted', { _id: deleted._id });
 

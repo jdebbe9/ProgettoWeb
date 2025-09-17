@@ -14,8 +14,7 @@ const appointmentSchema = new Schema(
         'accepted',
         'rejected',
         'cancelled',
-        'rescheduled',     // ⬅️ aggiunto per la riprogrammazione a slot
-        // sinonimi legacy accettati per compatibilità (verranno normalizzati)
+        'rescheduled',     
         'confirmed',
         'declined',
         'canceled',
@@ -24,11 +23,10 @@ const appointmentSchema = new Schema(
       index: true,
     },
 
-    // ⬇️ Nuovi campi per la modalità online
-    // Preferenza indicata dal paziente al momento della richiesta
+
     requestedOnline: { type: Boolean, default: false },
 
-    // Modalità decisa dal terapeuta all'accettazione
+    
     isOnline:  { type: Boolean, default: false },
     videoLink: { type: String, default: '', trim: true },
 
@@ -37,7 +35,7 @@ const appointmentSchema = new Schema(
   { timestamps: true }
 );
 
-// Normalizza eventuali sinonimi legacy
+
 appointmentSchema.pre('save', function normalizeStatus(next) {
   if (this.isModified('status') && typeof this.status === 'string') {
     const s = this.status.toLowerCase();

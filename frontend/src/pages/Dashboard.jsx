@@ -16,11 +16,11 @@ import LaptopMacIcon from '@mui/icons-material/LaptopMac';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import SchoolIcon from '@mui/icons-material/School';
 
-// Altezza fissa per uniformare le card
-const FEATURE_H = 110;  // "Cosa puoi fare qui"
-const SERVICE_H = 110;  // "Servizi"
 
-// Contenuti
+const FEATURE_H = 110;  
+const SERVICE_H = 110;  
+
+
 const FEATURES = [
   { icon: EventAvailableIcon, title: 'Richiedere e gestire gli appuntamenti', to: '/appointments' },
   { icon: EditNoteIcon,       title: 'Scrivere i tuoi pensieri nel diario personale', to: '/diary' },
@@ -82,7 +82,7 @@ export default function Dashboard() {
 
   return (
     <Box className="container" sx={{ mt: 3, mb: 6, maxWidth: 1100 }}>
-      {/* HERO */}
+      
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 3 }}>
         <Stack spacing={1}>
           <Typography variant="h5" fontWeight={700}>
@@ -94,12 +94,12 @@ export default function Dashboard() {
         </Stack>
       </Paper>
 
-      {/* COSA PUOI FARE QUI — 2×2 */}
+      
       <Typography variant="h6" sx={{ mb: 1.5 }}>Cosa puoi fare qui</Typography>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(2, 1fr)' }, // ⬅️ 2 colonne anche su desktop
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(2, 1fr)' }, 
           gap: 1,
           mb: 4,
           alignItems: 'stretch'
@@ -110,7 +110,7 @@ export default function Dashboard() {
         ))}
       </Box>
 
-      {/* SERVIZI — 3×2 */}
+     
       <Typography variant="h6" sx={{ mb: 1.5 }}>Servizi</Typography>
       <Box
         sx={{

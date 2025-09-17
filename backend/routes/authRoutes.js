@@ -30,9 +30,9 @@ if (limiter) {
 }
 
 router.post('/refresh', authController.refresh);
-router.get('/refresh',  authController.refresh); // utile in dev
+router.get('/refresh',  authController.refresh); 
 
-// Protette
+
 router.post('/logout', requireAuth, authController.logout);
 router.get('/me',      requireAuth, authController.me);
 router.patch('/me',    requireAuth, authController.updateMe);

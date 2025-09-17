@@ -39,13 +39,13 @@ export function connectSocket(userId) {
 
     const fire = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }));
 
-    // Bridge eventi appuntamenti
+    
     socket.on('appointment:created', (p) => fire('rt:appointment', { kind: 'created', payload: p }));
     socket.on('appointment:updated', (p) => fire('rt:appointment', { kind: 'updated', payload: p }));
     socket.on('appointment:deleted', (p) => fire('rt:appointment', { kind: 'deleted', payload: p }));
     socket.on('appointment:removed', (p) => fire('rt:appointment', { kind: 'removed', payload: p }));
 
-    // Bridge conteggio notifiche
+    
     socket.on('notifications:unread', (p) => fire('rt:notifications:unread', p));
   }
 

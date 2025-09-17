@@ -21,7 +21,7 @@ export default function Articles() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
-  const [orderBy, setOrderBy] = useState('updatedAt'); // 'updatedAt' | 'title'
+  const [orderBy, setOrderBy] = useState('updatedAt'); 
   const [err, setErr] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignItem, setAssignItem] = useState(null);
@@ -56,7 +56,7 @@ export default function Articles() {
     if (didAssign) load();
   };
 
-  // ordinamento client-side
+
   const sorted = useMemo(() => {
     const arr = [...items];
     if (orderBy === 'title') {
@@ -68,7 +68,7 @@ export default function Articles() {
     return arr;
   }, [items, orderBy]);
 
-  // KPI
+
   const kpi = useMemo(() => {
     const total = items.length;
     const published = items.filter(a => a.status === 'published').length;
@@ -80,7 +80,7 @@ export default function Articles() {
 
   return (
     <Box sx={{ p:2 }}>
-      {/* Header */}
+   
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="h5">Articoli</Typography>
         <Button variant="contained" onClick={() => navigate('/therapist/articles/new')}>Nuovo articolo</Button>
@@ -91,7 +91,7 @@ export default function Articles() {
 
       {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
 
-      {/* KPI strip */}
+      
       <Stack direction={{ xs:'column', sm:'row' }} spacing={2} sx={{ mb: 2 }}>
         <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 180 }}>
           <Typography variant="overline" color="text.secondary">Pubblicati</Typography>
@@ -103,7 +103,7 @@ export default function Articles() {
         </Paper>
       </Stack>
 
-      {/* Toolbar */}
+      
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Grid container alignItems="center" spacing={2}>
           <Grid item xs>
@@ -120,7 +120,7 @@ export default function Articles() {
                 <MenuItem value="published">Pubblicato</MenuItem>
               </Select>
 
-              {/* ⬇️ Label nel bordo (notch) */}
+              
               <FormControl size="small" sx={{ minWidth: 220 }}>
                 <InputLabel id="order-by-label" shrink>Ordina per</InputLabel>
                 <Select
@@ -143,7 +143,7 @@ export default function Articles() {
         </Grid>
       </Paper>
 
-      {/* Lista: UNA CARD PER RIGA */}
+      
       {loading ? (
         <Stack spacing={2}>
           {Array.from({ length: 4 }).map((_, i) => (
@@ -169,7 +169,7 @@ export default function Articles() {
               {sorted.map(a => (
                 <Card key={a._id} variant="outlined">
                   <CardContent>
-                    {/* Header: avatar + titolo */}
+                    
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar>
                         <ArticleIcon/>
@@ -179,13 +179,13 @@ export default function Articles() {
                       </Typography>
                     </Stack>
 
-                    {/* Riga data + stato */}
+                  
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                       {a.updatedAt ? new Date(a.updatedAt).toLocaleDateString('it-IT') : '—'}
                       {' • '}{statusLabel(a.status)}
                     </Typography>
 
-                    {/* Abstract */}
+                   
                     {getExcerpt(a) && (
                       <>
                         <Divider sx={{ my: 1 }} />
@@ -195,7 +195,7 @@ export default function Articles() {
                       </>
                     )}
 
-                    {/* Tag */}
+                  
                     {Array.isArray(a.tags) && a.tags.length > 0 && (
                       <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap' }}>
                         {a.tags.map(t => <Chip key={t} size="small" label={t} />)}
@@ -203,7 +203,7 @@ export default function Articles() {
                     )}
                   </CardContent>
 
-                  {/* Azioni */}
+               
                   <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
                     <Tooltip title="Assegna">
                       <IconButton onClick={() => openAssign(a)} aria-label="assegna">

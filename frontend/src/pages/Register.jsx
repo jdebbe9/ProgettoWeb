@@ -94,20 +94,20 @@ export default function Register() {
         <Typography variant="h5" sx={{ mb: 2 }}> <strong>Registrati</strong></Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* ===== FORM A CSS GRID ===== */}
+       
         <Box
           component="form"
           onSubmit={handleSubmit(onSubmit)}
           noValidate
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, // 2 colonne uguali da sm in su
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, 
             gap: 2,
             '& .MuiTextField-root': { width: '100%' },
             '& .MuiOutlinedInput-root': { borderRadius: 2 }
           }}
         >
-          {/* RIGA 1 */}
+       
           <TextField
             label="Nome"
             autoComplete="given-name"
@@ -123,7 +123,7 @@ export default function Register() {
             helperText={errors.surname?.message}
           />
 
-          {/* RIGA 2 */}
+          
           <TextField
             label="Data di nascita"
             type="date"
@@ -142,7 +142,7 @@ export default function Register() {
             helperText={errors.email?.message}
           />
 
-          {/* RIGA 3 — FULL WIDTH */}
+          
           <Box sx={{ gridColumn: '1 / -1' }}>
             <TextField
               label="Password"
@@ -169,7 +169,7 @@ export default function Register() {
             />
           </Box>
 
-          {/* CONSENSO — FULL WIDTH */}
+      
           <Box sx={{ gridColumn: '1 / -1' }}>
             <FormControlLabel
               sx={{ alignItems: 'flex-start', '.MuiTypography-root': { mt: '2px' } }}
@@ -199,7 +199,7 @@ export default function Register() {
             {errors.consent && <FormHelperText error>{errors.consent.message}</FormHelperText>}
           </Box>
 
-          {/* BLOCCO GENITORE — FULL WIDTH con sua grid 2 col */}
+       
           {isMinor && (
             <Box sx={{ gridColumn: '1 / -1' }}>
               <Paper sx={{ p: 2, border: '1px dashed rgba(0,0,0,.18)', bgcolor: 'background.default' }}>
@@ -259,7 +259,7 @@ export default function Register() {
             </Box>
           )}
 
-          {/* AZIONI — FULL WIDTH: sinistra testo, destra bottone */}
+          
           <Box
             sx={{
               gridColumn: '1 / -1',
@@ -278,7 +278,7 @@ export default function Register() {
           </Box>
         </Box>
 
-        {/* Dialog Informativa Privacy */}
+      
         <PrivacyDialog open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       </Paper>
     </Container>

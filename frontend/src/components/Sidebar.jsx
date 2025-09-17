@@ -21,12 +21,12 @@ import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import PushPinIcon from '@mui/icons-material/PushPin';
 
-// Dimensioni
+
 const APPBAR_HEIGHT = { xs: 56, sm: 64 };
 const SIDEBAR_WIDTH = { xs: 288, sm: 312 };
 const RAIL_WIDTH = { xs: 56, sm: 64 };
 
-// Helpers per localStorage
+
 const safeLS = {
   getFlag(key, fallback = false) {
     try {
@@ -74,7 +74,7 @@ export default function Sidebar() {
   const items = useNavItems(role);
   const [hoverOpen, setHoverOpen] = useState(false);
 
-  // 🔒 pin persistito
+  
   const [pinned, setPinned] = useState(() => safeLS.getFlag('sidebarPinned', false));
   useEffect(() => { safeLS.setFlag('sidebarPinned', pinned); }, [pinned]);
 
@@ -93,7 +93,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mini-rail SEMPRE visibile */}
+      
       <Paper
         elevation={0}
         onMouseEnter={() => setHoverOpen(true)}
@@ -122,7 +122,7 @@ export default function Sidebar() {
 
         <Divider sx={{ width: '60%', my: 0.5 }} />
 
-        {/* Icone verticali */}
+        
         {items.map((it) => {
           const active = isActive(it.to);
           return (
@@ -150,7 +150,6 @@ export default function Sidebar() {
 
         <Box sx={{ flexGrow: 1 }} />
 
-        {/* Toggle PIN anche dalla rail */}
         <Tooltip title={pinned ? 'Sblocca menu' : 'Blocca menu aperto'} placement="right">
           <IconButton
             onClick={togglePin}
@@ -164,7 +163,7 @@ export default function Sidebar() {
         </Tooltip>
       </Paper>
 
-      {/* Drawer esteso: resta aperto se pinned */}
+      
       <Drawer
         variant="temporary"
         anchor="left"

@@ -9,7 +9,7 @@ import { listBooks } from '../../api/books';
 import { createAssignment } from '../../api/assignments';
 
 export default function AssignToPatientDialog({ open, onClose, patient, defaultType = 'Article' }) {
-  const [itemType, setItemType] = useState(defaultType); // 'Article' | 'Book'
+  const [itemType, setItemType] = useState(defaultType); 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -17,7 +17,7 @@ export default function AssignToPatientDialog({ open, onClose, patient, defaultT
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // reset when open changes
+ 
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -27,7 +27,7 @@ export default function AssignToPatientDialog({ open, onClose, patient, defaultT
     }
   }, [open]);
 
-  // fetch items (debounced 300ms)
+  
   useEffect(() => {
     if (!open) return;
     let cancel = false;
@@ -36,10 +36,10 @@ export default function AssignToPatientDialog({ open, onClose, patient, defaultT
       try {
         let data = [];
         if (itemType === 'Article') {
-          // preferiamo solo pubblicati per il paziente
+          
           data = await listArticles({ q: query, status: 'published' });
         } else {
-          data = await listBooks({ q: query }); // tutti i libri dell’autore
+          data = await listBooks({ q: query }); 
         }
         if (!cancel) setItems(Array.isArray(data) ? data : []);
       } catch (e) {
@@ -64,7 +64,7 @@ export default function AssignToPatientDialog({ open, onClose, patient, defaultT
         itemType,
         itemId: selected._id,
       });
-      onClose?.(true); // chiudi segnalando successo
+      onClose?.(true); 
     } catch (e) {
       setErr(e?.response?.data?.message || 'Impossibile completare l’assegnazione.');
     } finally {

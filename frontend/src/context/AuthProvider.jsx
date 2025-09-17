@@ -9,7 +9,7 @@ export default function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const bootOnceRef = useRef(false);
 
-  // Silent refresh UNA volta solo se rilevo hasRefresh=1
+  
   useEffect(() => {
     if (bootOnceRef.current) return;
     bootOnceRef.current = true;
@@ -63,7 +63,7 @@ export default function AuthProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Socket connect/disconnect
+
   useEffect(() => {
     if (loading) return;
     if (user) {
@@ -77,11 +77,11 @@ export default function AuthProvider({ children }) {
   }, [user, loading]);
 
   const login = async (email, password) => {
-  // 1) login -> ottieni access token
+
   const { data } = await api.post('/auth/login', { email, password });
   if (data?.accessToken) setAccessToken(data.accessToken);
 
-  // 2) **sempre** ricarica il profilo completo
+
   const meResp = await api.get('/auth/me');
   const me = meResp.data || null;
 

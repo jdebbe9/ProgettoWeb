@@ -21,7 +21,7 @@ export default function PatientDetails() {
   const [data, setData]       = useState(null);
   const [tab, setTab]         = useState('overview');
 
-  // NOTE lato server
+  
   const [notes, setNotes] = useState('');
   const [notesLoaded, setNotesLoaded] = useState(false);
   const [notesSaving, setNotesSaving] = useState(false);
@@ -42,7 +42,7 @@ export default function PatientDetails() {
 
   useEffect(() => { load(); }, [load]);
 
-  // carica note dal server
+ 
   useEffect(() => {
     let alive = true;
     setNotesLoaded(false);

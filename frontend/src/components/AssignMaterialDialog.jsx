@@ -25,7 +25,6 @@ export default function AssignMaterialDialog({ open, onClose, itemType, item }) 
     }
   }, [open]);
 
-  // ricerca con debounce, prefisso nome/cognome
   useEffect(() => {
     if (!open) return;
     const q = query.trim();
@@ -65,14 +64,14 @@ export default function AssignMaterialDialog({ open, onClose, itemType, item }) 
     setErr('Elemento non valido. Chiudi e riapri la finestra, poi riprova.');
     return;
   }
-  if (saving) return; // evita doppio submit
+  if (saving) return; 
 
   setSaving(true);
   setErr('');
   try {
     await createAssignment({
       patientId: String(pid),
-      itemType: itemType === 'Book' ? 'Book' : 'Article', // normalizza
+      itemType: itemType === 'Book' ? 'Book' : 'Article', 
       itemId: String(iid),
       note: ''
     });
