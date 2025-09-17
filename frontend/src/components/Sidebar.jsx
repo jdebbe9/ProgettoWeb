@@ -4,6 +4,7 @@ import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
   Divider, Typography, Tooltip, IconButton, Paper
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,7 +26,7 @@ const APPBAR_HEIGHT = { xs: 56, sm: 64 };
 const SIDEBAR_WIDTH = { xs: 288, sm: 312 };
 const RAIL_WIDTH = { xs: 56, sm: 64 };
 
-// Helpers per localStorage (niente catch vuoti)
+// Helpers per localStorage
 const safeLS = {
   getFlag(key, fallback = false) {
     try {
@@ -73,7 +74,7 @@ export default function Sidebar() {
   const items = useNavItems(role);
   const [hoverOpen, setHoverOpen] = useState(false);
 
-  // 🔒 pin persistito senza catch vuoti
+  // 🔒 pin persistito
   const [pinned, setPinned] = useState(() => safeLS.getFlag('sidebarPinned', false));
   useEffect(() => { safeLS.setFlag('sidebarPinned', pinned); }, [pinned]);
 
@@ -130,9 +131,15 @@ export default function Sidebar() {
                 size="large"
                 onClick={() => handleNavigate(it.to)}
                 onMouseEnter={() => setHoverOpen(true)}
+                aria-current={active ? 'page' : undefined}
                 sx={{
                   my: 0.25,
-                  color: (theme) => active ? theme.palette.primary.main : theme.palette.text.secondary,
+                  color: (theme) =>
+                    active ? theme.palette.primary.main : theme.palette.text.secondary,
+                  '&:hover': (theme) => ({
+                    color: theme.palette.primary.main,
+                    backgroundColor: theme.palette.action.hover,
+                  }),
                 }}
               >
                 {it.icon}
@@ -145,7 +152,13 @@ export default function Sidebar() {
 
         {/* Toggle PIN anche dalla rail */}
         <Tooltip title={pinned ? 'Sblocca menu' : 'Blocca menu aperto'} placement="right">
-          <IconButton onClick={togglePin} sx={{ mb: 1 }} color={pinned ? 'primary' : 'default'}>
+          <IconButton
+            onClick={togglePin}
+            sx={{ mb: 1 }}
+            color={pinned ? 'primary' : 'default'}
+            aria-pressed={pinned ? 'true' : 'false'}
+            aria-label={pinned ? 'Sblocca menu' : 'Blocca menu aperto'}
+          >
             {pinned ? <PushPinIcon /> : <PushPinOutlinedIcon />}
           </IconButton>
         </Tooltip>
@@ -159,15 +172,16 @@ export default function Sidebar() {
         onClose={() => { if (!pinned) setHoverOpen(false); }}
         ModalProps={{ keepMounted: true }}
         PaperProps={{
-          sx: {
+          sx: (theme) => ({
             width: { xs: SIDEBAR_WIDTH.xs, sm: SIDEBAR_WIDTH.sm },
             top: { xs: APPBAR_HEIGHT.xs, sm: APPBAR_HEIGHT.sm },
             height: {
               xs: `calc(100% - ${APPBAR_HEIGHT.xs}px)`,
               sm: `calc(100% - ${APPBAR_HEIGHT.sm}px)`,
             },
-            borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-          }
+            borderRight: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.background.paper,
+          })
         }}
         onMouseLeave={() => { if (!pinned) setHoverOpen(false); }}
       >
@@ -177,7 +191,12 @@ export default function Sidebar() {
               Navigazione
             </Typography>
             <Tooltip title={pinned ? 'Sblocca menu' : 'Blocca menu aperto'}>
-              <IconButton onClick={togglePin} size="small" color={pinned ? 'primary' : 'default'}>
+              <IconButton
+                onClick={togglePin}
+                size="small"
+                color={pinned ? 'primary' : 'default'}
+                aria-pressed={pinned ? 'true' : 'false'}
+              >
                 {pinned ? <PushPinIcon fontSize="small" /> : <PushPinOutlinedIcon fontSize="small" />}
               </IconButton>
             </Tooltip>
@@ -186,27 +205,43 @@ export default function Sidebar() {
           <Divider sx={{ my: 1 }} />
 
           <List dense disablePadding>
-            {items.map((item) => (
-              <ListItemButton
-                key={item.to}
-                selected={isActive(item.to)}
-                onClick={() => handleNavigate(item.to)}
-                sx={{
-                  py: 1.15,
-                  '&.Mui-selected': {
-                    bgcolor: (theme) => theme.palette.action.selected,
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            ))}
+            {items.map((item) => {
+              const active = isActive(item.to);
+              return (
+                <ListItemButton
+                  key={item.to}
+                  selected={active}
+                  onClick={() => handleNavigate(item.to)}
+                  aria-current={active ? 'page' : undefined}
+                  sx={(theme) => ({
+                    py: 1.1,
+                    borderLeft: active ? `3px solid ${theme.palette.primary.main}` : '3px solid transparent',
+                    '& .MuiListItemIcon-root': {
+                      color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+                    },
+                    '& .MuiListItemText-primary': {
+                      fontWeight: active ? 600 : 500,
+                    },
+                    '&.Mui-selected': {
+                      color: theme.palette.primary.main,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                      },
+                    },
+                    '&:hover': {
+                      backgroundColor: theme.palette.action.hover,
+                    },
+                  })}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} />
+                </ListItemButton>
+              );
+            })}
           </List>
         </Box>
       </Drawer>
     </>
   );
 }
-
-

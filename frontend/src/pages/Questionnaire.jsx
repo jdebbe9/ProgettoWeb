@@ -5,14 +5,40 @@ import { useNavigate } from 'react-router-dom';
 import { submitQuestionnaire } from '../api/questionnaire';
 import { useAuth } from '../context/AuthContext';
 
-// Definisci qui le domande del tuo questionario
+// Nuove 6 domande (manteniamo gli stessi id q1..q6; aggiunto minRows per leggibilità)
 const questions = [
-  { id: 'q1', text: 'Come ti senti oggi, su una scala da 1 a 10?' },
-  { id: 'q2', text: "Descrivi il tuo umore prevalente nell'ultima settimana." },
-  { id: 'q3', text: 'Quali sono le principali fonti di stress che stai affrontando?' },
-  { id: 'q4', text: 'Ritieni di aver subito esperienze traumatiche?' },
-  { id: 'q5', text: 'Hai difficoltà a dormire o noti cambiamenti nel tuo appetito?' },
-  { id: 'q6', text: 'C’è qualcosa di specifico che vorresti discutere con il tuo terapeuta?' },
+  {
+    id: 'q1',
+    text: 'Ritengo di aver subito traumi dalla mia vita? Quali? E da parte di chi?',
+    minRows: 4,
+  },
+  {
+    id: 'q2',
+    text:
+      'Elenco di tutte le mie preoccupazioni ed elenco di tutto ciò che mi manda in depressione (nel presente, passato e futuro)',
+    minRows: 5,
+  },
+  {
+    id: 'q3',
+    text: 'Come vivo la mia sessualità? Ho fatto esperienze particolari? Quali?',
+    minRows: 4,
+  },
+  {
+    id: 'q4',
+    text:
+      'Elenco dei conflitti con la mia famiglia di origine. Con chi in particolare hai più conflitti?',
+    minRows: 4,
+  },
+  {
+    id: 'q5',
+    text: 'Elenco degli obiettivi che vorrei raggiungere venendo in psicoterapia',
+    minRows: 4,
+  },
+  {
+    id: 'q6',
+    text: 'Elenco di tutte le mie passioni',
+    minRows: 3,
+  },
 ];
 
 export default function Questionnaire() {
@@ -48,9 +74,10 @@ export default function Questionnaire() {
       return;
     }
 
+    // Invio come nel tuo backend: salviamo testo domanda + risposta
     const responses = questions.map(q => ({
       question: q.text,
-      answer: answers[q.id].trim()
+      answer: (answers[q.id] || '').trim(),
     }));
 
     try {
@@ -59,13 +86,13 @@ export default function Questionnaire() {
       // marca l'utente come con questionario completato
       setUser(prev => (prev ? { ...prev, questionnaireDone: true } : prev));
 
-      // fallback robusto per il "toast" in Appointments (oltre allo state del router)
+      // fallback per toast in Appointments
       localStorage.setItem('pc_qc_toast', '1');
 
-      // redirect agli appuntamenti + state per l'alert
+      // redirect agli appuntamenti + stato per l'alert
       navigate('/appointments', {
         replace: true,
-        state: { questionnaireJustCompleted: true }
+        state: { questionnaireJustCompleted: true },
       });
     } catch (e) {
       setError(e?.response?.data?.message || "Errore nell'invio del questionario.");
@@ -73,7 +100,6 @@ export default function Questionnaire() {
     }
   }
 
-  // Render del form (se non hai già il redirect)
   return (
     <Box className="container" sx={{ mt: 3 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Questionario Conoscitivo</Typography>
@@ -91,7 +117,7 @@ export default function Questionnaire() {
                 key={q.id}
                 label={q.text}
                 multiline
-                minRows={2}
+                minRows={q.minRows ?? 2}
                 value={answers[q.id] || ''}
                 onChange={(e) => handleAnswerChange(q.id, e.target.value)}
                 required
@@ -108,4 +134,3 @@ export default function Questionnaire() {
     </Box>
   );
 }
-

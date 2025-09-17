@@ -153,6 +153,14 @@ exports.clearAll = async (req, res, next) => {
     return next(e);
   }
 };
+exports.markRead = async (req, res) => {
+  const { id } = req.params;
+  await Notification.updateOne(
+    { _id: id, user: req.user.id },
+    { $set: { read: true, readAt: new Date() } }
+  );
+  res.json({ ok: true });
+};
 
 
 

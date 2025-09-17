@@ -99,7 +99,7 @@ export default function Goals(){
   return (
     <Box p={2}>
       <Stack spacing={2}>
-        <Typography variant="h4">           I MIEI OBIETTIVI      </Typography>
+        <Typography variant="h5" sx={{ mb:1.5 }}>Obiettivi</Typography>
         {err && <Alert severity="error">{err}</Alert>}
 
         {/* Nuovo obiettivo */}

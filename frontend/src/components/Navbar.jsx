@@ -12,11 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import NotificationsBell from './NotificationsBell';
 import Sidebar from './Sidebar';
 
-// ⬇️ tua icona BIANCA (trasparente) per la topbar
-import logoWhite from '../assets/psicocare-logo-white.png';
-
-// ⬇️ se per ora NON hai la versione bianca, usa TEMPORANEAMENTE la stessa favicon blu
-// import logoWhite from '/favicon.png'; // e lascia attivo il filtro CSS più sotto
+// Logo brand (versione chiara per topbar)
+import logoWhite from '../assets/logo-leradicidise-white.png';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -37,9 +34,9 @@ export default function Navbar() {
 
   return (
     <>
-      <AppBar position="static" color="primary" elevation={0}>
+      <AppBar position="sticky" color="primary" elevation={1}>
         <Toolbar sx={{ gap: 2 }}>
-          {/* Brand: tua icona + wordmark */}
+          {/* Brand: logo + wordmark */}
           <Box
             component={RouterLink}
             to="/"
@@ -50,25 +47,20 @@ export default function Navbar() {
               color: 'inherit',
               mr: 2
             }}
+            aria-label="Le radici di sè - Home"
           >
             <Box
               component="img"
               src={logoWhite}
               alt="Le radici di sè"
-              sx={{
-                width: 40,
-                height: 40,
-                mr: 1,
-                display: 'block',
-                // ⬇️ se stai usando PROVVISORIAMENTE la PNG blu, sbiancala con il filtro:
-                // filter: 'brightness(0) invert(1) saturate(0)',
-              }}
+              sx={{ width: 40, height: 40, mr: 1, display: 'block' }}
             />
             <Typography
               variant="h6"
-              sx={{ fontWeight: 500, letterSpacing: '.2px', lineHeight: 1 }}
+              sx={{ fontWeight: 600, letterSpacing: '.2px', lineHeight: 1 }}
+              display={{ xs: 'none', sm: 'block' }}
             >
-              Le radici di sè
+              le radici di sè
             </Typography>
           </Box>
 

@@ -1,17 +1,30 @@
-// backend/routes/notificationRoutes.js
+// routes/notificationsRoutes.js
 const express = require('express');
-const { requireAuth } = require('../middleware/authMiddleware');
-const ctrl = require('../controllers/notificationController');
-
 const router = express.Router();
 
-router.get('/unread-count', requireAuth, ctrl.getUnreadCount);
-router.get('/', requireAuth, ctrl.list);
-router.patch('/:id/read', requireAuth, ctrl.markOneRead);
-router.post(['/mark-all-read', '/markAllRead'], requireAuth, ctrl.markAllRead); // 👈 entrambe
-router.delete('/', requireAuth, ctrl.clearAll);
+const { requireAuth } = require('../middleware/authMiddleware');
+const ctrl = require('../controllers/notificationController'); // <– il tuo file
+
+router.use(requireAuth);
+
+// LIST + COUNT
+router.get('/', ctrl.list);
+router.get('/unread-count', ctrl.getUnreadCount);
+
+// READ ONE
+router.patch('/:id/read', ctrl.markOneRead);
+
+// MARK ALL READ — alias + metodi compat
+['mark-all-read', 'read-all', 'readall'].forEach((p) => {
+  router.patch(`/${p}`, ctrl.markAllRead);
+  router.post(`/${p}`,  ctrl.markAllRead);
+});
+
+// CLEAR ALL (opzionale)
+router.delete('/', ctrl.clearAll);
 
 module.exports = router;
+
 
 
 

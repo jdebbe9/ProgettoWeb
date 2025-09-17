@@ -11,8 +11,7 @@ import NotFound from '../pages/NotFound'
 import ProtectedRoute from '../components/ProtectedRoute'
 import TherapistDashboard from '../pages/therapist/TherapistDashboard'
 import Privacy from '../pages/Privacy'
-import ForgotPassword from '../pages/ForgotPassword'
-import ResetPassword from '../pages/ResetPassword'
+
 import Home from '../pages/Home'
 import Profile from '../pages/Profile'
 import Patients from '../pages/therapist/Patients';
@@ -23,7 +22,6 @@ import ArticlePublic from '../pages/ArticlePublic'; // <-- percorso corretto
 import TherapistSchedule from '../pages/therapist/TherapistSchedule'
 import TherapistProfile from '../pages/therapist/TherapistProfile';
 import ScheduleRequests from '../pages/therapist/ScheduleRequests';
-import ScheduleAvailability from '../pages/therapist/ScheduleAvailability';
 import Articles from '../pages/therapist/Articles';
 import ArticleEditor from '../pages/therapist/ArticleEditor';
 import Books from '../pages/therapist/Books';
@@ -42,8 +40,7 @@ export const router = createBrowserRouter([
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
       { path: 'privacy', element: <Privacy /> },
-      { path: 'forgot-password', element: <ForgotPassword /> },
-      { path: 'reset-password/:token', element: <ResetPassword /> },
+      
 
       // area utente (paziente)
       {
@@ -71,7 +68,7 @@ export const router = createBrowserRouter([
           { path: 'dashboard',          element: <TherapistDashboard /> },
           { path: 'schedule',           element: <TherapistSchedule /> },
           { path: 'schedule/requests',  element: <ScheduleRequests /> },
-          { path: 'schedule/availability', element: <ScheduleAvailability /> },
+          
           { path: 'patients',           element: <Patients /> },
           { path: 'patients/:id',       element: <PatientDetails /> },
           { path: 'articles',           element: <Articles /> },

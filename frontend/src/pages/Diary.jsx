@@ -351,7 +351,7 @@ export default function Diary() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" gap={2} mb={2}>
-        <Typography variant="h5" fontWeight={700}>Diario</Typography>
+        <Typography variant="h5" sx={{ mb:1.5 }}>Diario</Typography>
 
         <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
           {/* filtro date */}

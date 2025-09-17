@@ -17,6 +17,7 @@ export default function Footer() {
   return (
     <Box
       component="footer"
+      role="contentinfo"
       sx={{
         mt: { xs: 14, sm: 55 },
         bgcolor: 'background.paper',
@@ -33,32 +34,38 @@ export default function Footer() {
         >
           {/* Colonna 1: Studio */}
           <Grid item xs={12} md={4}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
               Le radici di sè
             </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>Info Studio</Typography>
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1, color: 'primary.main' }}>
+              Info Studio
+            </Typography>
+
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Dott. <strong>Felice Felicissimo</strong><br />
-              Psicoterapeuta – Iscr. Albo Psicologi <em>Puglia</em> <em>n. 1234</em>
+              Psicoterapeuta — Iscr. Albo Psicologi Puglia n. 1234
             </Typography>
 
             <Stack spacing={0.5} sx={{ mt: 1 }}>
               <Stack direction="row" spacing={1} alignItems="center">
-                <LocationOnIcon fontSize="small" />
+                <LocationOnIcon fontSize="small" color="primary" />
                 <Typography variant="body2">Via Esempio 123, Bari (BA)</Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
-                <PhoneIcon fontSize="small" />
+                <PhoneIcon fontSize="small" color="primary" />
                 <Typography variant="body2">+39 000 000 0000</Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
-                <EmailIcon fontSize="small" />
+                <EmailIcon fontSize="small" color="primary" />
                 <Typography variant="body2">
-                  <MuiLink href="mailto:info@psicocare.it">info@leradicidise.it</MuiLink>
+                  <MuiLink href="mailto:info@leradicidise.it" underline="hover">
+                    info@leradicidise.it
+                  </MuiLink>
                 </Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
-                <AccessTimeIcon fontSize="small" />
+                <AccessTimeIcon fontSize="small" color="primary" />
                 <Typography variant="body2">Lun–Ven 9:00–19:00</Typography>
               </Stack>
             </Stack>
@@ -66,7 +73,9 @@ export default function Footer() {
 
           {/* Colonna 2: Legale */}
           <Grid item xs={12} md={4} mt={4}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>Legale</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1, color: 'primary.main' }}>
+              Legale
+            </Typography>
             <Stack spacing={0.75}>
               <MuiLink component={RouterLink} to="/privacy" underline="hover">
                 Normativa Privacy
@@ -76,15 +85,38 @@ export default function Footer() {
 
           {/* Colonna 3: Social */}
           <Grid item xs={12} md={4} mt={4}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 0.5 }}>Social</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 0.5, color: 'primary.main' }}>
+              Social
+            </Typography>
             <Stack direction="row" spacing={0.5}>
-              <IconButton component="a" href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+              <IconButton
+                component="a"
+                href="https://www.linkedin.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                color="primary"
+              >
                 <LinkedInIcon />
               </IconButton>
-              <IconButton component="a" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+              <IconButton
+                component="a"
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                color="primary"
+              >
                 <InstagramIcon />
               </IconButton>
-              <IconButton component="a" href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+              <IconButton
+                component="a"
+                href="https://www.facebook.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                color="primary"
+              >
                 <FacebookIcon />
               </IconButton>
             </Stack>
@@ -96,29 +128,29 @@ export default function Footer() {
           <Typography variant="body2" color="text.secondary">
             P.IVA: IT01234567890 &nbsp;•&nbsp; Informativa telemedicina / consenso informato disponibile su richiesta.
           </Typography>
-<Alert
-  severity="warning"
-  sx={{
-    mt: 1.5,
-    width: '100%',
-    display: 'flex',
-    flexWrap: 'nowrap',        // mai andare a capo nel flex
-    overflowX: 'auto',         // se non basta lo spazio, scroll orizzontale
-    scrollbarWidth: 'none',    // nascondi scrollbar (Firefox)
-    '&::-webkit-scrollbar': { display: 'none' }, // nascondi scrollbar (WebKit)
-    '& .MuiAlert-icon': { mr: 1.5, flexShrink: 0 },
-    '& .MuiAlert-message': {
-      whiteSpace: 'nowrap',    // una sola riga
-      flexShrink: 0            // non comprimere il testo
-    }
-  }}
->
-  <span>
-    <strong>Non è un servizio di emergenza.</strong> In caso di urgenza rivolgiti al Pronto Soccorso
-    o chiama il 112. 
-  </span>
-</Alert>
 
+          <Alert
+            severity="warning"
+            sx={{
+              mt: 1.5,
+              width: '100%',
+              display: 'flex',
+              flexWrap: 'nowrap',        // mai andare a capo nel flex
+              overflowX: 'auto',         // se non basta lo spazio, scroll orizzontale
+              scrollbarWidth: 'none',    // nascondi scrollbar (Firefox)
+              '&::-webkit-scrollbar': { display: 'none' }, // nascondi scrollbar (WebKit)
+              '& .MuiAlert-icon': { mr: 1.5, flexShrink: 0 },
+              '& .MuiAlert-message': {
+                whiteSpace: 'nowrap',    // una sola riga
+                flexShrink: 0            // non comprimere il testo
+              }
+            }}
+          >
+            <span>
+              <strong>Non è un servizio di emergenza.</strong> In caso di urgenza rivolgiti al Pronto Soccorso
+              o chiama il 112.
+            </span>
+          </Alert>
         </Box>
 
         <Divider sx={{ my: 3 }} />

@@ -1,19 +1,26 @@
-<!-- index.html -->
 <!doctype html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Le radici di sè</title>
 
-    <!-- ✅ Favicon PNG + cache-busting -->
-    <link rel="icon" type="image/png" href="/favicon-psicocare.png?v=5" />
-    <link rel="shortcut icon" type="image/png" href="/favicon-psicocare.png?v=5" />
-    <link rel="apple-touch-icon" href="/favicon-psicocare.png?v=5" />
-
-    <meta name="theme-color" content="#1976d2" />
-    <meta name="color-scheme" content="light dark" />
+    <!-- App / SEO -->
+    <meta name="application-name" content="Le radici di sè" />
     <meta name="description" content="Le radici di sè — area personale per pazienti e gestione appuntamenti del terapeuta." />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Colore della UI mobile (barra indirizzi) -->
+    <meta name="theme-color" content="#0f5b49" />
+
+    <!-- Favicons (metti i file in /frontend/public) -->
+    <!-- Usa il logo verde su sfondo trasparente per essere visibile su tab chiare -->
+    <link rel="icon" type="image/png" href="/favicon.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/favicon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- (opzionale) manifest PWA
+    <link rel="manifest" href="/site.webmanifest" />
+    -->
   </head>
   <body>
     <div id="root"></div>

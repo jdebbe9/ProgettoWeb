@@ -1,25 +1,22 @@
 // src/main.jsx
-import React from 'react'
+import React, { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
-import { ThemeProvider, CssBaseline, createTheme } from '@mui/material'
+import { ThemeProvider, CssBaseline } from '@mui/material'
 
 import { router } from './router/routes'
 import AuthProvider from './context/AuthProvider'
+import theme from './theme'
 import './styles/globals.css'
 
-const theme = createTheme({
-  palette: { mode: 'light' },
-  shape: { borderRadius: 12 }
-})
-
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  <StrictMode>
     <ThemeProvider theme={theme}>
-      <CssBaseline />
+      {/* abilita automatic color-scheme per OS */}
+      <CssBaseline enableColorScheme />
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>
     </ThemeProvider>
-  </React.StrictMode>
+  </StrictMode>
 )

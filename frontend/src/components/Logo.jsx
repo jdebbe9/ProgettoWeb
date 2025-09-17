@@ -1,51 +1,60 @@
-// src/components/Logo.jsx
 import * as React from 'react';
 
 /**
- * Logo Le radici di sè — "testa + groviglio" dentro un badge circolare.
+ * Logo "Le radici di sè" — icona vettoriale (circolare con volto) + wordmark opzionale.
  * Pensato per rendere bene anche a 24–40px.
  *
  * Props:
- * - variant: 'icon' | 'wordmark'
+ * - variant: 'icon' | 'wordmark'  (default: 'wordmark')
  * - size: altezza icona in px (default 40)
  * - strokeWidth: spessore linee (default 1.9 per viewBox 24)
- * - label: testo (default "Le radici di sè")
- * - labelWeight: peso font (default 500)
+ * - label: testo wordmark (default "Le radici di sè")
+ * - labelWeight: peso font (default 600)
  * - labelScale: fattore rispetto all’icona per la dimensione del testo (default 0.9)
- * - color: opzionale (se non passato usa currentColor)
+ * - color: forza il colore (altrimenti usa currentColor e quindi eredita dal parent)
+ * - decorative: se true, nasconde l’icona agli screen reader (utile quando c’è già il testo)
  */
-export default function Logo({
-  variant = 'wordmark',
-  size = 40,
-  strokeWidth = 1.9,
-  label = 'Le radici di sè',
-  labelWeight = 500,
-  labelScale = 0.9,
-  color,
-  style,
-  ...props
-}) {
+const Logo = React.forwardRef(function Logo(
+  {
+    variant = 'wordmark',
+    size = 40,
+    strokeWidth = 1.9,
+    label = 'Le radici di sè',
+    labelWeight = 600,
+    labelScale = 0.9,
+    color,
+    decorative = false,
+    style,
+    ...props
+  },
+  ref
+) {
   const stroke = color ? { stroke: color } : { stroke: 'currentColor' };
+  const titleId = React.useId();
 
   const Icon = (
     <svg
+      ref={ref}
       width={size}
       height={size}
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="PsicoCare"
+      aria-hidden={decorative ? true : undefined}
+      aria-labelledby={decorative ? undefined : titleId}
       style={style}
+      shapeRendering="geometricPrecision"
       {...props}
     >
+      {!decorative && <title id={titleId}>{label}</title>}
       <g fill="none" {...stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-        {/* Badge */}
+        {/* Badge circolare */}
         <circle cx="12" cy="12" r="10" />
-        {/* Testa (volto) */}
+        {/* Volto */}
         <circle cx="12" cy="9" r="3.2" />
         {/* Spalle */}
         <path d="M5.5 19c.7-3 3.9-5 6.5-5s5.8 2 6.5 5" />
-        {/* Groviglio cervello (semplice e leggibile) */}
+        {/* Groviglio/mente (linea semplice, leggibile a piccole dimensioni) */}
         <path d="M10.2 8.6c1-.8 2.6-.6 3.4.3.8.9.7 2.3-.3 3.1-.9.7-2.2.7-3.1 0-.6-.5-.6-1.6 0-2.3" />
       </g>
     </svg>
@@ -53,6 +62,7 @@ export default function Logo({
 
   if (variant === 'icon') return Icon;
 
+  // Variante wordmark: l’icona diventa decorativa (screen reader leggono il testo)
   return (
     <span
       style={{
@@ -60,20 +70,23 @@ export default function Logo({
         alignItems: 'center',
         gap: 10,
         lineHeight: 1,
-        color: color || 'inherit',
+        color: color || 'inherit', // eredita dal parent (es. bianco in AppBar scura)
         ...style
       }}
     >
-      {Icon}
+      {React.cloneElement(Icon, { decorative: true })}
       <span
         style={{
-          fontWeight: labelWeight,      // più leggero del 700
+          fontWeight: labelWeight,
           letterSpacing: '.1px',
           fontSize: Math.round(size * labelScale),
+          whiteSpace: 'nowrap'
         }}
       >
         {label}
       </span>
     </span>
   );
-}
+});
+
+export default Logo;

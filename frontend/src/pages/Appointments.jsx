@@ -39,9 +39,16 @@ function statusItLower(s) {
 }
 function computeProfileCompleteLocal(obj) {
   const has = v => typeof v === 'string' && v.trim().length > 0;
+
+  const cap   = obj?.cap ?? obj?.postalCode ?? obj?.zipcode ?? obj?.zip;
+  const addr  = obj?.address ?? obj?.addressLine1 ?? obj?.street ?? obj?.via;
+  const city  = obj?.city ?? obj?.citta ?? obj?.locality;
+  
+
   return has(obj?.name) && has(obj?.surname) && has(obj?.email) &&
-         has(obj?.address) && has(obj?.city) && has(obj?.cap) && has(obj?.phone);
+         has(addr) && has(city) && has(cap);
 }
+
 
 // griglia settimanale
 function startOfWeek(d) {
@@ -89,6 +96,18 @@ export default function Appointments() {
 
   // ⬇️ profilo completo?
   const [profileOk, setProfileOk] = useState(true);
+
+
+  const refreshProfileOk = useCallback(async () => {
+  try {
+    const data = await fetchMe();
+    const ok = Boolean(data?.profileComplete) || computeProfileCompleteLocal(data);
+    setProfileOk(ok);
+  } catch {
+    // se fallisce, non cambiare lo stato
+  }
+}, []);
+
 
   const today = useMemo(() => new Date(), []);
   const tomorrow0 = useMemo(() => { const t = new Date(); t.setDate(t.getDate()+1); t.setHours(0,0,0,0); return t; }, []);
@@ -160,6 +179,15 @@ export default function Appointments() {
       if (fromState) navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
+
+  // ⬇️ ricalcola al mount, e ogni volta che la finestra torna in focus
+useEffect(() => {
+  refreshProfileOk(); // subito
+  const onFocus = () => refreshProfileOk();
+  window.addEventListener('focus', onFocus);
+  return () => window.removeEventListener('focus', onFocus);
+}, [refreshProfileOk]);
+
 
   // realtime reload
   const reloadDebounced = useCallback(() => {
@@ -298,22 +326,36 @@ export default function Appointments() {
 
   return (
     <Box className="container" sx={{ mt: 3, maxWidth: 1200 }}>
-      <Typography variant="h5" sx={{ mb: 1 }}>Appuntamenti</Typography>
+      
 
       {/* ⬇️ Avviso profilo incompleto */}
-      {!profileOk && (
-        <Alert
-          severity="warning"
-          sx={{ mb: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => navigate('/profile')}>
-              Vai al profilo
-            </Button>
-          }
-        >
-          <strong>Completa il tuo profilo</strong> per poter prenotare il tuo appuntamento.
-        </Alert>
-      )}
+      {!questionnaireDone && (
+  <Alert
+    severity="warning"
+    sx={{ mb: 2 }}
+    action={
+      <Button color="inherit" size="small" onClick={() => navigate('/questionnaire')}>
+        Vai al questionario
+      </Button>
+    }
+  >
+    <strong>Completa il questionario</strong> per poter prenotare il tuo appuntamento.
+  </Alert>
+)}
+
+{!profileOk && (
+  <Alert
+    severity="warning"
+    sx={{ mb: 2 }}
+    action={
+      <Button color="inherit" size="small" onClick={() => navigate('/profile')}>
+        Vai al profilo
+      </Button>
+    }
+  >
+    <strong>Completa il tuo profilo</strong> per poter prenotare il tuo appuntamento.
+  </Alert>
+)}
 
       {/* Tabs: Calendario / I miei Appuntamenti */}
       <Paper sx={{ mb: 2 }}>

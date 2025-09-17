@@ -92,9 +92,7 @@ export function LoginPanel() {
         </Button>
 
         <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
-          <Typography variant="body2">
-            <RouterLink to="/forgot-password">Password dimenticata?</RouterLink>
-          </Typography>
+          
           <Typography variant="body2">
             <RouterLink to="/register">Crea un account</RouterLink>
           </Typography>

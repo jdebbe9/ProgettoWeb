@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Alert, Box, Button, Paper, TextField, Typography,
   FormControlLabel, Checkbox, FormHelperText, Link as MuiLink,
-  InputAdornment, IconButton
+  InputAdornment, IconButton, Container
 } from '@mui/material'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
@@ -15,7 +15,7 @@ import { register as apiRegister } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import PrivacyDialog from '../components/PrivacyDialog'
 
-// util: calcola età da yyyy-mm-dd
+// utils
 function ageFromISO(dobStr) {
   if (!dobStr) return null
   const dob = new Date(dobStr)
@@ -26,11 +26,9 @@ function ageFromISO(dobStr) {
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
   return age
 }
-
-// trasforma '' -> undefined per evitare validazioni "fantasma"
 const emptyToUndef = (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v)
 
-// schema base
+// schema
 const baseSchema = z.object({
   name: z.string().min(2, 'Min 2 caratteri'),
   surname: z.string().min(2, 'Min 2 caratteri'),
@@ -39,15 +37,12 @@ const baseSchema = z.object({
   password: z.string().min(6, 'Min 6 caratteri'),
   consent: z.literal(true, { errorMap: () => ({ message: 'Devi accettare il consenso privacy.' }) }),
 
-  // campi genitore (accettano '' che viene trasformato in undefined)
   parentFirstName: z.preprocess(emptyToUndef, z.string().min(2, 'Nome genitore non valido').optional()),
   parentLastName:  z.preprocess(emptyToUndef, z.string().min(2, 'Cognome genitore non valido').optional()),
   parentEmail:     z.preprocess(emptyToUndef, z.string().email('Email genitore non valida').optional()),
   parentPhone:     z.preprocess(emptyToUndef, z.string().min(6, 'Telefono genitore non valido').optional()),
   parentConsent:   z.boolean().optional(),
 })
-
-// regola condizionale: se <18 → richiedi campi genitore + parentConsent true
 const schema = baseSchema.superRefine((val, ctx) => {
   const age = ageFromISO(val.birthDate)
   const isMinor = age !== null && age < 18
@@ -72,23 +67,11 @@ export default function Register() {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      name: '',
-      surname: '',
-      birthDate: '',
-      email: '',
-      password: '',
-      consent: false,
-      // i campi genitore non sono montati finché non sei minore, ma
-      // se mai comparissero preferiamo stringhe vuote che diventano undefined col preprocess
-      parentFirstName: '',
-      parentLastName: '',
-      parentEmail: '',
-      parentPhone: '',
-      parentConsent: false,
+      name: '', surname: '', birthDate: '', email: '', password: '', consent: false,
+      parentFirstName: '', parentLastName: '', parentEmail: '', parentPhone: '', parentConsent: false,
     }
   })
 
-  // UI reattiva: mostra blocco genitore se minore
   const birthDate = useWatch({ control, name: 'birthDate' })
   const isMinor = useMemo(() => {
     const a = ageFromISO(birthDate)
@@ -98,11 +81,7 @@ export default function Register() {
   const onSubmit = async (values) => {
     setError('')
     try {
-      await apiRegister({
-        ...values,
-        isMinor: isMinor === true
-      })
-      // vai al login dopo la registrazione
+      await apiRegister({ ...values, isMinor: isMinor === true })
       navigate('/login')
     } catch (e) {
       setError(e?.response?.data?.message || e?.message || 'Registrazione non riuscita.')
@@ -110,62 +89,99 @@ export default function Register() {
   }
 
   return (
-    <Box className="container" sx={{ mt: 6, maxWidth: 680 }}>
-      <Paper sx={{ p: 3 }} elevation={3}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Registrati</Typography>
+    <Container maxWidth="sm" sx={{ py: { xs: 4, md: 6 } }}>
+      <Paper sx={{ p: { xs: 2.5, sm: 3.5 }, borderRadius: 2 }} elevation={3}>
+        <Typography variant="h5" sx={{ mb: 2 }}> <strong>Registrati</strong></Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <form className="stack" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div className="row">
-            <TextField label="Nome" {...register('name')} error={!!errors.name} helperText={errors.name?.message} sx={{ flex: 1, minWidth: 200 }} />
-            <TextField label="Cognome" {...register('surname')} error={!!errors.surname} helperText={errors.surname?.message} sx={{ flex: 1, minWidth: 200 }} />
-          </div>
+        {/* ===== FORM A CSS GRID ===== */}
+        <Box
+          component="form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, // 2 colonne uguali da sm in su
+            gap: 2,
+            '& .MuiTextField-root': { width: '100%' },
+            '& .MuiOutlinedInput-root': { borderRadius: 2 }
+          }}
+        >
+          {/* RIGA 1 */}
+          <TextField
+            label="Nome"
+            autoComplete="given-name"
+            {...register('name')}
+            error={!!errors.name}
+            helperText={errors.name?.message}
+          />
+          <TextField
+            label="Cognome"
+            autoComplete="family-name"
+            {...register('surname')}
+            error={!!errors.surname}
+            helperText={errors.surname?.message}
+          />
 
+          {/* RIGA 2 */}
           <TextField
             label="Data di nascita"
             type="date"
             InputLabelProps={{ shrink: true }}
+            autoComplete="bday"
             {...register('birthDate')}
             error={!!errors.birthDate}
             helperText={errors.birthDate?.message}
           />
-
           <TextField
             label="Email"
             type="email"
+            autoComplete="email"
             {...register('email')}
             error={!!errors.email}
             helperText={errors.email?.message}
           />
 
-          {/* PASSWORD con toggle visibilità */}
-          <TextField
-            label="Password"
-            type={showPassword ? 'text' : 'password'}
-            {...register('password')}
-            error={!!errors.password}
-            helperText={errors.password?.message}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
-                    onClick={() => setShowPassword(p => !p)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
+          {/* RIGA 3 — FULL WIDTH */}
+          <Box sx={{ gridColumn: '1 / -1' }}>
+            <TextField
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              fullWidth
+              {...register('password')}
+              error={!!errors.password}
+              helperText={errors.password?.message}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
+                      onClick={() => setShowPassword(p => !p)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Box>
 
-          <div>
+          {/* CONSENSO — FULL WIDTH */}
+          <Box sx={{ gridColumn: '1 / -1' }}>
             <FormControlLabel
-              control={<Controller name="consent" control={control} render={({ field }) => (
-                <Checkbox checked={!!field.value} onChange={(e)=>field.onChange(e.target.checked)} />
-              )} />}
+              sx={{ alignItems: 'flex-start', '.MuiTypography-root': { mt: '2px' } }}
+              control={
+                <Controller
+                  name="consent"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox checked={!!field.value} onChange={(e)=>field.onChange(e.target.checked)} />
+                  )}
+                />
+              }
               label={
                 <span>
                   Acconsento al trattamento dei dati personali secondo l’{' '}
@@ -181,50 +197,90 @@ export default function Register() {
               }
             />
             {errors.consent && <FormHelperText error>{errors.consent.message}</FormHelperText>}
-          </div>
+          </Box>
 
+          {/* BLOCCO GENITORE — FULL WIDTH con sua grid 2 col */}
           {isMinor && (
-            <Paper sx={{ p: 2, border: '1px dashed rgba(0,0,0,.2)' }}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>Dati genitore / tutore (obbligatori per minori)</Typography>
-              <div className="row">
-                <TextField label="Nome genitore" {...register('parentFirstName')} error={!!errors.parentFirstName} helperText={errors.parentFirstName?.message} sx={{ flex: 1, minWidth: 200 }} />
-                <TextField label="Cognome genitore" {...register('parentLastName')} error={!!errors.parentLastName} helperText={errors.parentLastName?.message} sx={{ flex: 1, minWidth: 200 }} />
-              </div>
-              <div className="row">
-                <TextField label="Email genitore" type="email" {...register('parentEmail')} error={!!errors.parentEmail} helperText={errors.parentEmail?.message} sx={{ flex: 1, minWidth: 240 }} />
-                <TextField label="Telefono genitore" {...register('parentPhone')} error={!!errors.parentPhone} helperText={errors.parentPhone?.message} sx={{ flex: 1, minWidth: 200 }} />
-              </div>
-              <FormControlLabel
-                control={<Controller name="parentConsent" control={control} render={({ field }) => (
-                  <Checkbox checked={!!field.value} onChange={(e)=>field.onChange(e.target.checked)} />
-                )} />}
-                label="Dichiaro, in qualità di genitore/tutore, di prestare il consenso informato per la presa in carico del minore."
-              />
-              {errors.parentConsent && <FormHelperText error>{errors.parentConsent.message}</FormHelperText>}
-            </Paper>
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Paper sx={{ p: 2, border: '1px dashed rgba(0,0,0,.18)', bgcolor: 'background.default' }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  Dati genitore / tutore (obbligatori per minori)
+                </Typography>
+
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 2
+                  }}
+                >
+                  <TextField
+                    label="Nome genitore"
+                    {...register('parentFirstName')}
+                    error={!!errors.parentFirstName}
+                    helperText={errors.parentFirstName?.message}
+                  />
+                  <TextField
+                    label="Cognome genitore"
+                    {...register('parentLastName')}
+                    error={!!errors.parentLastName}
+                    helperText={errors.parentLastName?.message}
+                  />
+                  <TextField
+                    label="Email genitore"
+                    type="email"
+                    {...register('parentEmail')}
+                    error={!!errors.parentEmail}
+                    helperText={errors.parentEmail?.message}
+                  />
+                  <TextField
+                    label="Telefono genitore"
+                    {...register('parentPhone')}
+                    error={!!errors.parentPhone}
+                    helperText={errors.parentPhone?.message}
+                  />
+                  <Box sx={{ gridColumn: '1 / -1' }}>
+                    <FormControlLabel
+                      control={
+                        <Controller
+                          name="parentConsent"
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox checked={!!field.value} onChange={(e)=>field.onChange(e.target.checked)} />
+                          )}
+                        />
+                      }
+                      label="Dichiaro, in qualità di genitore/tutore, di prestare il consenso informato per la presa in carico del minore."
+                    />
+                    {errors.parentConsent && <FormHelperText error>{errors.parentConsent.message}</FormHelperText>}
+                  </Box>
+                </Box>
+              </Paper>
+            </Box>
           )}
 
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Invio…' : 'Crea account'}
-          </Button>
-        </form>
+          {/* AZIONI — FULL WIDTH: sinistra testo, destra bottone */}
+          <Box
+            sx={{
+              gridColumn: '1 / -1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              mt: 0.5
+            }}
+          >
+            <Typography variant="body2">
+              Hai già un account? <RouterLink to="/login">Accedi</RouterLink>
+            </Typography>
+            <Button type="submit" variant="contained" disabled={isSubmitting}>
+              {isSubmitting ? 'Invio…' : 'Crea account'}
+            </Button>
+          </Box>
+        </Box>
 
-        <Typography sx={{ mt: 2 }} variant="body2">
-          Hai già un account? <RouterLink to="/login">Accedi</RouterLink>
-        </Typography>
+        {/* Dialog Informativa Privacy */}
+        <PrivacyDialog open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       </Paper>
-
-      {/* Dialog Informativa Privacy */}
-      <PrivacyDialog open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
-    </Box>
+    </Container>
   )
 }
-
-
-
-
-
-
-
-
-

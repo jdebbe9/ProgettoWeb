@@ -42,17 +42,6 @@ export async function register(payload) {
   return data;
 }
 
-// PASSWORD RESET
-export async function forgotPassword(emailOrObj) {
-  const email = typeof emailOrObj === 'string' ? emailOrObj : emailOrObj?.email;
-  const { data } = await api.post('/auth/forgot-password', { email });
-  return data;
-}
-
-export async function resetPassword({ token, password }) {
-  const { data } = await api.post('/auth/reset-password', { token, password });
-  return data;
-}
 
 
 

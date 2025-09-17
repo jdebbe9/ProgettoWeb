@@ -102,7 +102,7 @@ export default function Materials(){
               <Paper
                 key={a._id}
                 variant="outlined"
-                sx={{ p: 1, borderRadius: 2 }}
+                sx={{ p: 1, borderRadius: 1 }}
               >
                 <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
                   {/* Info elemento */}
