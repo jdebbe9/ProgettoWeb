@@ -49,7 +49,7 @@ export default function BookEditor() {
   return (
     <Box sx={{ p:2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h5">{isNew ? 'Nuovo libro' : 'Modifica libro'}</Typography>
+        <Typography variant="h5">{isNew ? 'Aggiungi nuovo libro al catalogo' : 'Modifica libro'}</Typography>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" onClick={() => navigate('/therapist/books')}>Annulla</Button>
           <Button variant="contained" onClick={save}>Salva</Button>

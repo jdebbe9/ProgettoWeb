@@ -1,7 +1,7 @@
 // frontend/src/pages/Dashboard.jsx
 import { Link as RouterLink } from 'react-router-dom';
 import {
-  Alert, Box, Button, Chip, Grid, Paper, Stack, Typography, Divider
+  Box, Button, Paper, Stack, Typography
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,25 +9,23 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import Diversity2Icon from '@mui/icons-material/Diversity2';
 import LaptopMacIcon from '@mui/icons-material/LaptopMac';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import SchoolIcon from '@mui/icons-material/School';
-import SecurityIcon from '@mui/icons-material/Security';
 
-// === dimensioni uniformi (qui puoi ritoccare i valori) ===
-const FEATURE_MIN_H = 96;   // riquadri "Cosa puoi fare qui"
-const SERVICE_MIN_H = 120;  // riquadri "Servizi"
+// Altezza fissa per uniformare le card
+const FEATURE_H = 110;  // "Cosa puoi fare qui"
+const SERVICE_H = 110;  // "Servizi"
 
 // Contenuti
 const FEATURES = [
   { icon: EventAvailableIcon, title: 'Richiedere e gestire gli appuntamenti', to: '/appointments' },
-  { icon: EditNoteIcon,       title: 'Scrivere il diario personale (anche privato)', to: '/diary' },
+  { icon: EditNoteIcon,       title: 'Scrivere i tuoi pensieri nel diario personale', to: '/diary' },
   { icon: MenuBookIcon,       title: 'Consultare i materiali assegnati', to: '/materials' },
-  { icon: CheckCircleIcon,    title: 'Tenere traccia di obiettivi e compiti tra sedute', to: '/goals' },
+  { icon: CheckCircleIcon,    title: 'Tenere traccia dei tuoi obiettivi', to: '/goals' },
 ];
 
 const SERVICES = [
@@ -44,17 +42,16 @@ function FeatureItem({ icon: Icon, title, to }) {
     <Paper
       variant="outlined"
       sx={{
-        p: 2, borderRadius: 3,
-        minHeight: FEATURE_MIN_H,      // ⬅️ altezza identica
-        width: '100%',
+        p: 2, borderRadius: 2,
+        height: FEATURE_H,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ pr: 1 }}>
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ pr: 1, minWidth: 0 }}>
         {Icon && <Icon fontSize="small" />}
-        <Typography fontWeight={700}>{title}</Typography>
+        <Typography fontWeight={700} noWrap title={title}>{title}</Typography>
       </Stack>
-      <Button size="small" component={RouterLink} to={to} variant="contained">APRI</Button>
+      <Button size="small" component={RouterLink} to={to} sx={{ alignSelf: 'center' } }>APRI</Button>
     </Paper>
   );
 }
@@ -64,17 +61,18 @@ function ServiceCard({ icon: Icon, title, subtitle }) {
     <Paper
       variant="outlined"
       sx={{
-        p: 2, borderRadius: 3,
-        minHeight: SERVICE_MIN_H,      // ⬅️ altezza identica
-        width: '100%',
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 1
+        p: 2, borderRadius: 2,
+        height: SERVICE_H,
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 1, minWidth: 0
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
         {Icon && <Icon fontSize="small" />}
-        <Typography fontWeight={700}>{title}</Typography>
+        <Typography fontWeight={700} noWrap title={title}>{title}</Typography>
       </Stack>
-      <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
+      <Typography variant="body2" color="text.secondary" noWrap title={subtitle}>
+        {subtitle}
+      </Typography>
     </Paper>
   );
 }
@@ -85,10 +83,10 @@ export default function Dashboard() {
   return (
     <Box className="container" sx={{ mt: 3, mb: 6, maxWidth: 1100 }}>
       {/* HERO */}
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 3 }}>
         <Stack spacing={1}>
           <Typography variant="h5" fontWeight={700}>
-            Ciao {user?.name ? `${user.name}` : 'e benvenuto/a'} 
+            Ciao {user?.name ? `${user.name}` : 'e benvenuto/a'}
           </Typography>
           <Typography color="text.secondary">
             Questo è il tuo spazio riservato: semplice, discreto e professionale dove troverai il necessario per seguire il percorso con continuità.
@@ -96,29 +94,37 @@ export default function Dashboard() {
         </Stack>
       </Paper>
 
-      {/* COSA PUOI FARE QUI — 2×2 simmetrico */}
+      {/* COSA PUOI FARE QUI — 2×2 */}
       <Typography variant="h6" sx={{ mb: 1.5 }}>Cosa puoi fare qui</Typography>
-      <Grid container spacing={2} sx={{ mb: 4 }} alignItems="stretch">
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(2, 1fr)' }, // ⬅️ 2 colonne anche su desktop
+          gap: 1,
+          mb: 4,
+          alignItems: 'stretch'
+        }}
+      >
         {FEATURES.map((f, i) => (
-          <Grid key={i} item xs={12} md={6} sx={{ display: 'flex' }}>
-            <FeatureItem {...f} />
-          </Grid>
+          <FeatureItem key={i} {...f} />
         ))}
-      </Grid>
+      </Box>
 
-      {/* SERVIZI — 3×2 simmetrico */}
+      {/* SERVIZI — 3×2 */}
       <Typography variant="h6" sx={{ mb: 1.5 }}>Servizi</Typography>
-      <Grid container spacing={2} sx={{ mb: 4 }} alignItems="stretch">
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+          gap: 1,
+          mb: 4,
+          alignItems: 'stretch'
+        }}
+      >
         {SERVICES.map((s, i) => (
-          <Grid key={i} item xs={12} md={4} sx={{ display: 'flex' }}>
-            <ServiceCard {...s} />
-          </Grid>
+          <ServiceCard key={i} {...s} />
         ))}
-      </Grid>
+      </Box>
     </Box>
   );
 }
-
-
-
-

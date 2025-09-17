@@ -30,7 +30,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${raw}`;
     const body = [
-      'Hai richiesto il reset della password su PsicoCare.',
+      'Hai richiesto il reset della password su Le radici di sè.',
       'Se non sei stato tu, ignora questa email.',
       '',
       `Per reimpostare la password clicca qui (valido 15 minuti):`,

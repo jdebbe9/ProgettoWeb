@@ -18,46 +18,43 @@ export default function Footer() {
     <Box
       component="footer"
       sx={{
-        // ↑ più spazio tra contenuto pagina e footer
-        mt: { xs: 14, sm: 38 },
+        mt: { xs: 14, sm: 55 },
         bgcolor: 'background.paper',
         borderTop: (t) => `1px solid ${t.palette.divider}`,
       }}
     >
       <Container sx={{ py: { xs: 3, sm: 5 } }}>
-        <Grid container spacing={4}>
+        {/* Tre colonne sulla stessa riga */}
+        <Grid
+          container
+          columnSpacing={{ xs: 2, sm: 4, md: 26 }}
+          rowSpacing={{ xs: 3, md: 2 }}
+          alignItems="flex-start"
+        >
           {/* Colonna 1: Studio */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={12} md={4}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Studio PsicoCare
+              Le radici di sè
             </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>Info Studio</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Dott. <strong>[Felice Felicissimo]</strong><br />
-              Psicoterapeuta – Iscr. Albo Psicologi <em>[Regione]</em> n. <em>[XXXX]</em>
+              Dott. <strong>Felice Felicissimo</strong><br />
+              Psicoterapeuta – Iscr. Albo Psicologi <em>Puglia</em> <em>n. 1234</em>
             </Typography>
 
             <Stack spacing={0.5} sx={{ mt: 1 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <LocationOnIcon fontSize="small" />
-                <Typography variant="body2">
-                  <MuiLink
-                    href="https://maps.google.com/?q=Indirizzo+Studio"
-                    target="_blank" rel="noopener noreferrer"
-                  >
-                    Via Esempio 123, Città (XX)
-                  </MuiLink>
-                </Typography>
+                <Typography variant="body2">Via Esempio 123, Bari (BA)</Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
                 <PhoneIcon fontSize="small" />
-                <Typography variant="body2">
-                  <MuiLink href="tel:+390000000000">+39 000 000 0000</MuiLink>
-                </Typography>
+                <Typography variant="body2">+39 000 000 0000</Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
                 <EmailIcon fontSize="small" />
                 <Typography variant="body2">
-                  <MuiLink href="mailto:info@psicocare.it">info@psicocare.it</MuiLink>
+                  <MuiLink href="mailto:info@psicocare.it">info@leradicidise.it</MuiLink>
                 </Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
@@ -67,34 +64,20 @@ export default function Footer() {
             </Stack>
           </Grid>
 
-          {/* Colonna 2: Per i pazienti */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Per i pazienti</Typography>
-            <Stack spacing={0.75}>
-              <MuiLink component={RouterLink} to="/appointments" underline="hover">Appuntamenti</MuiLink>
-              <MuiLink component={RouterLink} to="/materials" underline="hover">Materiali</MuiLink>
-              <MuiLink component={RouterLink} to="/diary" underline="hover">Diario</MuiLink>
-              <MuiLink component={RouterLink} to="/profile" underline="hover">Profilo</MuiLink>
-            </Stack>
-
+          {/* Colonna 2: Legale */}
+          <Grid item xs={12} md={4} mt={4}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>Legale</Typography>
             <Stack spacing={0.75}>
-              <MuiLink component={RouterLink} to="/privacy" underline="hover">Privacy</MuiLink>
-              <MuiLink component={RouterLink} to="/terms" underline="hover">Termini di servizio</MuiLink>
-              <MuiLink component={RouterLink} to="/cookies" underline="hover">Cookie</MuiLink>
-              <MuiLink component={RouterLink} to="/accessibility" underline="hover">Accessibilità</MuiLink>
+              <MuiLink component={RouterLink} to="/privacy" underline="hover">
+                Normativa Privacy
+              </MuiLink>
             </Stack>
           </Grid>
 
-          {/* Colonna 3: Emergenze + Social */}
-          <Grid item xs={12} md={5}>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              <strong>Non è un servizio di emergenza.</strong> In caso di urgenza rivolgiti al Pronto Soccorso
-              o chiama il 112. Inserisci qui i numeri utili locali se necessario.
-            </Alert>
-
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Seguimi</Typography>
-            <Stack direction="row" spacing={1}>
+          {/* Colonna 3: Social */}
+          <Grid item xs={12} md={4} mt={4}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 0.5 }}>Social</Typography>
+            <Stack direction="row" spacing={0.5}>
               <IconButton component="a" href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
                 <LinkedInIcon />
               </IconButton>
@@ -105,15 +88,38 @@ export default function Footer() {
                 <FacebookIcon />
               </IconButton>
             </Stack>
-
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                P.IVA: <em>[IT01234567890]</em> &nbsp;•&nbsp;
-                Informativa telemedicina / consenso informato disponibile su richiesta.
-              </Typography>
-            </Box>
           </Grid>
         </Grid>
+
+        {/* P.IVA + ALERT fuori dalla Grid, così l'alert riempie tutta la larghezza del Container */}
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            P.IVA: IT01234567890 &nbsp;•&nbsp; Informativa telemedicina / consenso informato disponibile su richiesta.
+          </Typography>
+<Alert
+  severity="warning"
+  sx={{
+    mt: 1.5,
+    width: '100%',
+    display: 'flex',
+    flexWrap: 'nowrap',        // mai andare a capo nel flex
+    overflowX: 'auto',         // se non basta lo spazio, scroll orizzontale
+    scrollbarWidth: 'none',    // nascondi scrollbar (Firefox)
+    '&::-webkit-scrollbar': { display: 'none' }, // nascondi scrollbar (WebKit)
+    '& .MuiAlert-icon': { mr: 1.5, flexShrink: 0 },
+    '& .MuiAlert-message': {
+      whiteSpace: 'nowrap',    // una sola riga
+      flexShrink: 0            // non comprimere il testo
+    }
+  }}
+>
+  <span>
+    <strong>Non è un servizio di emergenza.</strong> In caso di urgenza rivolgiti al Pronto Soccorso
+    o chiama il 112. 
+  </span>
+</Alert>
+
+        </Box>
 
         <Divider sx={{ my: 3 }} />
 
@@ -125,9 +131,8 @@ export default function Footer() {
           alignItems={{ xs: 'flex-start', sm: 'center' }}
         >
           <Typography variant="body2" color="text.secondary">
-            © {YEAR} Studio PsicoCare — Tutti i diritti riservati.
+            © {YEAR} Le radici di sè — Tutti i diritti riservati.
           </Typography>
-          
         </Stack>
       </Container>
     </Box>

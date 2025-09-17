@@ -10,7 +10,7 @@ export default function PrivacyContent() {
       <Typography variant="body2" component="div">
         <p>
           Questa informativa descrive le modalità di trattamento dei dati personali
-          nell’ambito del progetto universitario “PsicoCare”. I dati sono trattati
+          nell’ambito del progetto universitario “Le radici di sè”. I dati sono trattati
           esclusivamente per finalità di autenticazione, gestione degli appuntamenti,
           diario e questionari, nell’ambiente di test.
         </p>
@@ -25,8 +25,7 @@ export default function PrivacyContent() {
         </p>
         <p>
           Tempi di conservazione: limitati alla durata del progetto e comunque non oltre
-          quanto necessario per gli scopi didattici. Ulteriori dettagli sono disponibili
-          nell’informativa completa.
+          quanto necessario per gli scopi didattici. 
         </p>
       </Typography>
       {/* ⬆️ FINE segnaposto */}

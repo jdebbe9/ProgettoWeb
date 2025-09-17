@@ -40,10 +40,6 @@ export default function ScheduleRequests() {
   const [acceptIsOnline, setAcceptIsOnline] = useState(false);
   const [acceptVideoLink, setAcceptVideoLink] = useState('');
 
-  // Reject
-  const [rejectId, setRejectId] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
-
   // Reschedule
   const [reschedAppt, setReschedAppt] = useState(null);
   const [reschedWeekStart, setReschedWeekStart] = useState(() => startOfWeekMonday(new Date()));
@@ -97,11 +93,16 @@ export default function ScheduleRequests() {
     } finally { setBusyId(null); }
   };
 
-  const handleReject = async () => {
-    if (!rejectId) return;
-    setBusyId(rejectId);
-    try { await updateAppointment(rejectId, { status: 'rejected', reason: rejectReason || undefined }); await load(); }
-    finally { setBusyId(null); setRejectId(null); setRejectReason(''); }
+  // RIFIUTO ISTANTANEO (niente dialog)
+  const handleReject = async (id) => {
+    if (!id) return;
+    setBusyId(id);
+    try {
+      await updateAppointment(id, { status: 'rejected' });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const openReschedule = (appt) => { setReschedAppt(appt); setReschedWeekStart(startOfWeekMonday(new Date(appt.date || Date.now()))); };
@@ -190,7 +191,7 @@ export default function ScheduleRequests() {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => setRejectId(a._id)}
+                      onClick={() => handleReject(a._id)}
                       disabled={busyId === a._id}
                     >
                       <CloseIcon fontSize="small" />
@@ -236,27 +237,6 @@ export default function ScheduleRequests() {
               </IconButton>
             </span>
           </Tooltip>
-        </DialogActions>
-      </Dialog>
-
-      {/* RIFIUTA */}
-      <Dialog open={!!rejectId} onClose={() => setRejectId(null)}>
-        <DialogTitle>Rifiuta richiesta</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            label="Motivo (opzionale)"
-            fullWidth
-            margin="dense"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <IconButton onClick={() => setRejectId(null)}><CloseIcon /></IconButton>
-          <IconButton color="error" onClick={handleReject} disabled={busyId === rejectId}>
-            <CloseIcon />
-          </IconButton>
         </DialogActions>
       </Dialog>
 

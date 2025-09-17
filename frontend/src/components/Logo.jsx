@@ -2,14 +2,14 @@
 import * as React from 'react';
 
 /**
- * Logo PsicoCare — "testa + groviglio" dentro un badge circolare.
+ * Logo Le radici di sè — "testa + groviglio" dentro un badge circolare.
  * Pensato per rendere bene anche a 24–40px.
  *
  * Props:
  * - variant: 'icon' | 'wordmark'
  * - size: altezza icona in px (default 40)
  * - strokeWidth: spessore linee (default 1.9 per viewBox 24)
- * - label: testo (default "PsicoCare")
+ * - label: testo (default "Le radici di sè")
  * - labelWeight: peso font (default 500)
  * - labelScale: fattore rispetto all’icona per la dimensione del testo (default 0.9)
  * - color: opzionale (se non passato usa currentColor)
@@ -18,7 +18,7 @@ export default function Logo({
   variant = 'wordmark',
   size = 40,
   strokeWidth = 1.9,
-  label = 'PsicoCare',
+  label = 'Le radici di sè',
   labelWeight = 500,
   labelScale = 0.9,
   color,

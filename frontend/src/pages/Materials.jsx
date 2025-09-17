@@ -1,15 +1,14 @@
 // frontend/src/pages/Materials.jsx
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Box, Stack, Typography, Paper, Chip, Button, Alert, Divider, TextField, Select, MenuItem } from '@mui/material';
+import {
+  Box, Stack, Typography, Paper, Chip, Button, Alert, Divider, TextField, Select, MenuItem,
+  IconButton, Tooltip
+} from '@mui/material';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { Link as RouterLink } from 'react-router-dom';
 import { listAssignments, updateAssignment } from '../api/assignments';
 import { listPublishedArticles } from '../api/articles';
 
-function statusLabel(s){
-  if (s==='done') return 'Letto';
-  if (s==='in_progress') return 'In corso';
-  return 'Da leggere';
-}
 function formatDate(d) {
   try { return new Date(d).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' }); }
   catch { return ''; }
@@ -87,13 +86,12 @@ export default function Materials(){
       {/* Sezione: Letture assegnate */}
       <Box>
         <Typography variant="h5" sx={{ mb:1.5 }}>Letture assegnate</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb:2 }}>
-          Qui trovi libri e articoli che il terapeuta ti ha assegnato. Puoi segnare lo stato di avanzamento.
-        </Typography>
+
+        
 
         {errAssign && <Alert severity="error" sx={{ mb:2 }}>{errAssign}</Alert>}
 
-        <Stack spacing={1.25}>
+        <Stack spacing={1}>
           {assignments.map(a=>{
             const isBook = a.itemType === 'Book';
             const purchaseUrl = isBook
@@ -101,10 +99,15 @@ export default function Materials(){
               : '';
 
             return (
-              <Paper key={a._id} variant="outlined" sx={{ p: 1.5 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} flexWrap="wrap">
-                  <div>
-                    <Typography fontWeight="bold">
+              <Paper
+                key={a._id}
+                variant="outlined"
+                sx={{ p: 1, borderRadius: 2 }}
+              >
+                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
+                  {/* Info elemento */}
+                  <Stack spacing={0.25} sx={{ minWidth: 220 }}>
+                    <Typography fontWeight={700} sx={{ lineHeight: 1.2 }}>
                       {a.item?.title || 'Elemento'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -113,13 +116,9 @@ export default function Materials(){
                         : 'Articolo'}
                     </Typography>
 
-                    {/* Stato lettura */}
-                    <Chip size="small" label={statusLabel(a.status)} sx={{ mt: 1 }} />
-
                     {/* Link acquisto libro, se disponibile */}
                     {isBook && purchaseUrl && (
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        {/* "scritta" cliccabile come richiesto */}
+                      <Typography variant="body2" sx={{ mt: 0.25 }}>
                         <a
                           href={purchaseUrl}
                           target="_blank"
@@ -130,11 +129,22 @@ export default function Materials(){
                         </a>
                       </Typography>
                     )}
-                  </div>
+                  </Stack>
 
-                  <Stack direction="row" spacing={1}>
-                    <Button size="small" disabled={busy===a._id} onClick={()=>mark(a._id,'in_progress')}>In corso</Button>
-                    <Button size="small" variant="contained" disabled={busy===a._id} onClick={()=>mark(a._id,'done')}>Segna letto</Button>
+                  {/* Stato compatto: Select a destra */}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="caption" color="text.secondary">Stato</Typography>
+                    <Select
+                      size="small"
+                      value={a.status || 'todo'}
+                      onChange={(e)=> mark(a._id, e.target.value)}
+                      disabled={busy === a._id}
+                      sx={{ minWidth: 100 }}
+                    >
+                      
+                      <MenuItem value="in_progress">In corso</MenuItem>
+                      <MenuItem value="done">Letto</MenuItem>
+                    </Select>
                   </Stack>
                 </Stack>
               </Paper>
@@ -148,10 +158,10 @@ export default function Materials(){
 
       <Divider />
 
-      {/* Sezione: Articoli del terapeuta (newsletter-style) */}
+      {/* Sezione: Articoli del terapeuta */}
       <Box>
         <Stack direction={{ xs:'column', sm:'row' }} spacing={2} alignItems={{ sm:'center' }} sx={{ mb:2 }}>
-          <Typography variant="h5" sx={{ flexGrow:1 }}>Articoli del terapeuta</Typography>
+          <Typography variant="h5" sx={{ flexGrow:1 }}>Articoli pubblicati</Typography>
           <TextField
             label="Cerca"
             value={q}
@@ -169,7 +179,13 @@ export default function Materials(){
             <MenuItem value=""><em>Tutti i tag</em></MenuItem>
             {availableTags.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </Select>
-          <Button onClick={loadArticles}>Filtra</Button>
+
+          {/* ⬇️ Sostituisce il bottone 'Filtra' con icona imbuto */}
+          <Tooltip title="Filtra">
+            <IconButton onClick={loadArticles} size="small" aria-label="Filtra articoli">
+              <FilterListIcon />
+            </IconButton>
+          </Tooltip>
         </Stack>
 
         {errArticles && <Alert severity="error" sx={{ mb:2 }}>{errArticles}</Alert>}

@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Alert, Box, CircularProgress, Paper, Stack, TextField, Typography, Button,
   Chip, FormControlLabel, Switch, MenuItem, Select, InputLabel, FormControl,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
+  IconButton, Tooltip, Grid
 } from '@mui/material';
+import CachedIcon from '@mui/icons-material/Cached';
 import { Link as RouterLink } from 'react-router-dom';
 import { getAllPatients } from '../../api/therapists';
 import PatientDrawer from '../../components/patients/PatientDrawer';
@@ -108,6 +110,13 @@ export default function Patients() {
     setDrawerOpen(true);
   };
 
+  const resetFilters = () => {
+    setQ('');
+    setOnlyNoQuestionnaire(false);
+    setOrderBy('name');
+    setOrder('asc');
+  };
+
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Pazienti</Typography>
@@ -131,55 +140,55 @@ export default function Patients() {
 
       {/* Toolbar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
-          <TextField
-            label="Cerca per nome o email"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            sx={{ maxWidth: 360 }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={onlyNoQuestionnaire}
-                onChange={(e) => setOnlyNoQuestionnaire(e.target.checked)}
+        <Grid container alignItems="center" spacing={2}>
+          {/* Sinistra: filtri */}
+          <Grid item xs>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              alignItems={{ md: 'center' }}
+              sx={{ flexWrap: 'wrap' }}
+            >
+              <TextField
+                label="Cerca per nome o email"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                sx={{ maxWidth: 360, minWidth: 30}}
               />
-            }
-            label="Solo senza questionario"
-          />
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="order-by-label">Ordina per</InputLabel>
-            <Select
-              labelId="order-by-label"
-              value={orderBy}
-              label="Ordina per"
-              onChange={(e) => setOrderBy(e.target.value)}
-            >
-              <MenuItem value="name">Nome</MenuItem>
-              <MenuItem value="email">Email</MenuItem>
-              <MenuItem value="createdAt">Data creazione</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel id="order-dir-label">Direzione</InputLabel>
-            <Select
-              labelId="order-dir-label"
-              value={order}
-              label="Direzione"
-              onChange={(e) => setOrder(e.target.value)}
-            >
-              <MenuItem value="asc">Crescente</MenuItem>
-              <MenuItem value="desc">Decrescente</MenuItem>
-            </Select>
-          </FormControl>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={onlyNoQuestionnaire}
+                    onChange={(e) => setOnlyNoQuestionnaire(e.target.checked)}
+                  />
+                }
+                label="Solo senza questionario"
+              />
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id="order-by-label">Ordina per</InputLabel>
+                <Select
+                  labelId="order-by-label"
+                  value={orderBy}
+                  label="Ordina per"
+                  onChange={(e) => setOrderBy(e.target.value)}
+                >
+                  <MenuItem value="name">Nome</MenuItem>
+                  <MenuItem value="email">Email</MenuItem>
+                  <MenuItem value="createdAt">Data creazione</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+          </Grid>
 
-          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
-            <Button variant="outlined" onClick={() => { setQ(''); setOnlyNoQuestionnaire(false); setOrderBy('name'); setOrder('asc'); }}>
-              Pulisci
-            </Button>
-            <Button variant="contained" onClick={load}>Aggiorna</Button>
-          </Stack>
-        </Stack>
+      
+          <Grid item>
+            <Tooltip title="Reimposta filtri">
+              <IconButton onClick={resetFilters} aria-label="Reimposta filtri">
+                <CachedIcon />
+              </IconButton>
+            </Tooltip>
+          </Grid>
+        </Grid>
       </Paper>
 
       {/* Tabella */}

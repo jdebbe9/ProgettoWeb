@@ -3,20 +3,15 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Alert, Box, Button, Chip, CircularProgress, Divider, Paper, Stack, Tab, Tabs, Typography, TextField
 } from '@mui/material';
+
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { getPatientDetails } from '../../api/therapists';
+import { getPatientDetails, getPrivateNote, savePrivateNote } from '../../api/therapists';
 
 function formatDT(d) {
   try { return new Date(d).toLocaleString('it-IT'); } catch { return '—'; }
 }
 function formatD(d) {
   try { return new Date(d).toLocaleDateString('it-IT', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' }); } catch { return '—'; }
-}
-
-function useLocalNotes(key) {
-  const [value, setValue] = useState(() => localStorage.getItem(key) || '');
-  const save = (v) => { setValue(v); localStorage.setItem(key, v); };
-  return [value, save];
 }
 
 export default function PatientDetails() {
@@ -26,7 +21,12 @@ export default function PatientDetails() {
   const [data, setData]       = useState(null);
   const [tab, setTab]         = useState('overview');
 
-  const [notes, setNotes] = useLocalNotes(`notes:patient:${id}`);
+  // NOTE lato server
+  const [notes, setNotes] = useState('');
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesUpdatedAt, setNotesUpdatedAt] = useState(null);
+  const [notesError, setNotesError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -41,6 +41,40 @@ export default function PatientDetails() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // carica note dal server
+  useEffect(() => {
+    let alive = true;
+    setNotesLoaded(false);
+    setNotesError('');
+    (async () => {
+      try {
+        const { text = '', updatedAt = null } = await getPrivateNote(id);
+        if (!alive) return;
+        setNotes(text || '');
+        setNotesUpdatedAt(updatedAt || null);
+      } catch (e) {
+        if (!alive) return;
+        setNotesError(e?.response?.data?.message || 'Errore nel caricamento delle note.');
+      } finally {
+        if (alive) setNotesLoaded(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, [id]);
+
+  const handleSaveNotes = async () => {
+    setNotesSaving(true);
+    setNotesError('');
+    try {
+      const { updatedAt = null } = await savePrivateNote(id, notes);
+      setNotesUpdatedAt(updatedAt || null);
+    } catch (e) {
+      setNotesError(e?.response?.data?.message || 'Errore durante il salvataggio delle note.');
+    } finally {
+      setNotesSaving(false);
+    }
+  };
 
   const questionnaire = data?.questionnaire;
   const diary = data?.diary || [];
@@ -74,7 +108,7 @@ export default function PatientDetails() {
               <Tab value="questionnaire" label="Questionario" />
               <Tab value="diary" label="Diario" />
               <Tab value="appointments" label="Appuntamenti" />
-              <Tab value="notes" label="Note (solo terapeuta)" />
+              <Tab value="notes" label="Note" />
             </Tabs>
           </Paper>
 
@@ -186,17 +220,34 @@ export default function PatientDetails() {
 
           {tab === 'notes' && (
             <Paper variant="outlined" sx={{ p: 2 }}>
+              {notesError && <Alert severity="error" sx={{ mb: 1 }}>{notesError}</Alert>}
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Queste note sono salvate solo sul tuo dispositivo (localStorage). In un passaggio futuro possiamo sincronizzarle lato server.
+                
               </Typography>
               <TextField
-                label="Appunti privati"
+                label="Appunti paziente"
                 fullWidth
                 multiline
                 minRows={6}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                disabled={!notesLoaded}
               />
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Ultimo salvataggio: {notesUpdatedAt ? formatDT(notesUpdatedAt) : '—'}
+                </Typography>
+                <Button
+   variant="contained"
+   onClick={handleSaveNotes}
+   disabled={!notesLoaded || notesSaving}
+   startIcon={notesSaving ? <CircularProgress size={18} /> : null}
+>
+   {notesSaving ? 'Salvataggio…' : 'Salva'}
+ </Button>
+                
+
+              </Stack>
             </Paper>
           )}
         </>

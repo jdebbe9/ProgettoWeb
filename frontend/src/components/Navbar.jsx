@@ -54,7 +54,7 @@ export default function Navbar() {
             <Box
               component="img"
               src={logoWhite}
-              alt="PsicoCare"
+              alt="Le radici di sè"
               sx={{
                 width: 40,
                 height: 40,
@@ -68,7 +68,7 @@ export default function Navbar() {
               variant="h6"
               sx={{ fontWeight: 500, letterSpacing: '.2px', lineHeight: 1 }}
             >
-              PsicoCare
+              Le radici di sè
             </Typography>
           </Box>
 

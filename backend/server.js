@@ -83,6 +83,8 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/safety-plan', safetyPlanRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/therapist/notes', require('./routes/therapistNotesRoutes'));
+
 
 
 /* 404 & error handler */

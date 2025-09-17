@@ -5,7 +5,7 @@ import { LoginPanel } from './Login';
 
 export default function Home() {
   // ⇣ scegli qui la tua frase (pronta la #8)
-  const HEADLINE = 'PsicoCare Studio.';
+  const HEADLINE = 'Le radici di sè.';
   const SUBHEAD  = 'Il tuo spazio riservato per capire, scegliere, ripartire.';
 
   // punti brevi (opzionali)

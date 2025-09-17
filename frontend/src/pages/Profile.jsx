@@ -1,13 +1,15 @@
 // frontend/src/pages/Profile.jsx
 import { useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Grid, Paper, TextField, Typography, Snackbar,
-  IconButton, Checkbox, FormControlLabel, Link as MuiLink
+  Alert, Box, Button, Paper, TextField, Typography, Snackbar,
+  IconButton, Checkbox, FormControlLabel, InputAdornment, Tooltip, Stack
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { Link as RouterLink } from 'react-router-dom';
-import { getMe as fetchMe, updateMe } from '../api/user'; // ✅ API corrette
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import EditIcon from '@mui/icons-material/Edit';
+import { getMe as fetchMe, updateMe } from '../api/user';
 import { useAuth } from '../context/AuthContext';
 
 /* ---------------- utils ---------------- */
@@ -19,29 +21,24 @@ function formatDateInput(iso) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
 }
-
-// Parser indirizzo robusto
 function splitAddress(full) {
   const s = String(full || '').trim().replace(/,\s*$/, '');
   if (!s) return { street: '', number: '' };
-  let m = s.match(/^(.+?)\s+(\d+[A-Za-z]?(?:[/-]\d+[A-Za-z]?)?)$/); // 12, 12A, 12/A, 12-14
+  let m = s.match(/^(.+?)\s+(\d+[A-Za-z]?(?:[/-]\d+[A-Za-z]?)?)$/);
   if (m) return { street: m[1], number: m[2] };
-  m = s.match(/^(.+?)\s+(\d+)\s+(bis|ter|quater)$/i); // 12 bis
+  m = s.match(/^(.+?)\s+(\d+)\s+(bis|ter|quater)$/i);
   if (m) return { street: m[1], number: `${m[2]} ${m[3].toLowerCase()}` };
   const tokens = s.split(/\s+/);
   for (let i = tokens.length - 1; i >= 0; i--) if (/\d/.test(tokens[i]))
     return { street: tokens.slice(0, i).join(' '), number: tokens.slice(i).join(' ') };
   return { street: s, number: '' };
 }
-
-// ⚙️ stesso criterio del virtual Mongoose user.profileComplete
-function computeProfileCompleteLocal({ name, surname, email, city, cap, phone, address }) {
+// profilo completo (telefono escluso)
+function computeProfileCompleteLocal({ name, surname, email, city, cap, address }) {
   const has = v => typeof v === 'string' && v.trim().length > 0;
-  return has(name) && has(surname) && has(email) && has(city) && has(address) && has(cap) && has(phone);
+  return has(name) && has(surname) && has(email) && has(city) && has(address) && has(cap);
 }
-
 const EMPTY_EC = { name: '', relation: '', phone: '', email: '', consent: false };
-
 function toProfileStateFromServer(data) {
   const { street, number } = splitAddress(data.address);
   return {
@@ -52,7 +49,6 @@ function toProfileStateFromServer(data) {
     questionnaireDone: !!data.questionnaireDone,
     city: data.city || '',
     cap: data.cap || '',
-    phone: data.phone || '',
     emergencyContacts:
       Array.isArray(data.emergencyContacts) && data.emergencyContacts.length
         ? data.emergencyContacts.map(c => ({
@@ -68,6 +64,66 @@ function toProfileStateFromServer(data) {
   };
 }
 
+/* ---- “InfoField”: testo in view, TextField in edit, stessa larghezza ---- */
+function InfoField({ label, value, onChange, type = 'text', editMode = false, placeholder }) {
+  return (
+    <Box>
+      <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '.08em' }}>
+        {label}
+      </Typography>
+      {editMode ? (
+        <TextField
+          fullWidth
+          type={type}
+          value={value ?? ''}
+          onChange={(e)=>onChange(e.target.value)}
+          placeholder={placeholder}
+          InputLabelProps={type === 'date' ? { shrink: true } : undefined}
+        />
+      ) : (
+        <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+          {value || '—'}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+function InfoPassword({ label, value, onChange, editMode }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Box>
+      <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '.08em' }}>
+        {label}
+      </Typography>
+      {editMode ? (
+        <TextField
+          fullWidth
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={(e)=>onChange(e.target.value)}
+          placeholder="Lascia vuoto per non cambiare"
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={()=>setVisible(v=>!v)}>
+                  {visible ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </InputAdornment>
+            )
+          }}
+        />
+      ) : (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="body2">********</Typography>
+          <Tooltip title="La password si modifica in modalità modifica">
+            <VisibilityOffIcon fontSize="small" sx={{ opacity: .5 }} />
+          </Tooltip>
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 /* --------------- component --------------- */
 export default function Profile() {
   const { setUser } = useAuth();
@@ -79,8 +135,8 @@ export default function Profile() {
 
   const [addrStreet, setAddrStreet] = useState('');
   const [addrNumber, setAddrNumber] = useState('');
+  const [password, setPassword] = useState('');
 
-  // Load iniziale
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -90,7 +146,7 @@ export default function Profile() {
         const p = toProfileStateFromServer(data);
         setProfile({
           name: p.name, surname: p.surname, birthDate: p.birthDate, email: p.email,
-          questionnaireDone: p.questionnaireDone, city: p.city, cap: p.cap, phone: p.phone,
+          questionnaireDone: p.questionnaireDone, city: p.city, cap: p.cap,
           emergencyContacts: p.emergencyContacts,
         });
         setAddrStreet(p.__addrStreet);
@@ -110,9 +166,7 @@ export default function Profile() {
     })
   );
 
-  function updateField(field, value) {
-    setProfile(p => ({ ...p, [field]: value }));
-  }
+  function updateField(field, value) { setProfile(p => ({ ...p, [field]: value })); }
   function updateEC(idx, field, value) {
     setProfile(p => {
       const list = [...(p.emergencyContacts || [])];
@@ -139,9 +193,8 @@ export default function Profile() {
 
   async function onSave(e) {
     e.preventDefault();
-    if (!profile || !editMode) return;
-    setError('');
-    setSaving(true);
+    if (!profile) return;
+    setError(''); setSaving(true);
     try {
       const addressCombined = `${addrStreet} ${addrNumber}`.trim();
       const payload = {
@@ -152,7 +205,6 @@ export default function Profile() {
         address: addressCombined,
         city: (profile.city || '').trim(),
         cap: (profile.cap || '').trim(),
-        phone: (profile.phone || '').trim(),
         emergencyContacts: (profile.emergencyContacts || [])
           .slice(0, 2)
           .map(c => ({
@@ -162,44 +214,35 @@ export default function Profile() {
             email: String(c?.email || '').trim(),
             consent: !!c?.consent
           }))
-          .filter(c => c.name && c.phone), // coerente con lo schema
+          .filter(c => c.name && c.phone),
       };
+      if (password.trim()) payload.password = password.trim();
 
-      // Salva lato server
       await updateMe(payload);
 
-      // Provo a ricaricare dal server (se fallisce, userò i dati locali)
       let fresh = null;
-      try { fresh = await fetchMe(); } catch { /* fallback a dati locali */ }
+      try { fresh = await fetchMe(); } catch {/**/}
 
-      // Calcolo profileComplete in LOCALE per aggiornare SUBITO il contesto
       const basis = fresh || { ...payload, questionnaireDone: profile.questionnaireDone };
       const computedComplete = computeProfileCompleteLocal({
         name: basis.name, surname: basis.surname, email: basis.email,
-        city: basis.city, cap: basis.cap, phone: basis.phone, address: basis.address,
+        city: basis.city, cap: basis.cap, address: basis.address,
       });
 
-      // Aggiorno AuthContext immediatamente (sblocca Appuntamenti)
-      setUser(prev => {
-        const merged = { ...(prev || {}), ...(fresh || {}), profileComplete: computedComplete };
-        return merged;
-      });
+      setUser(prev => ({ ...(prev || {}), ...(fresh || {}), profileComplete: computedComplete }));
 
-      // Aggiorno stato locale con i dati (preferisci server se disponibile)
       if (fresh) {
         const p = toProfileStateFromServer(fresh);
         setProfile({
           name: p.name, surname: p.surname, birthDate: p.birthDate, email: p.email,
-          questionnaireDone: p.questionnaireDone, city: p.city, cap: p.cap, phone: p.phone,
+          questionnaireDone: p.questionnaireDone, city: p.city, cap: p.cap,
           emergencyContacts: p.emergencyContacts,
         });
         setAddrStreet(p.__addrStreet);
         setAddrNumber(p.__addrNumber);
-      } else {
-        // fallback: allinea dallo stesso payload
-        setProfile(p => ({ ...p, ...payload }));
       }
 
+      setPassword('');
       setSnack({ open: true, message: 'Profilo aggiornato.', severity: 'success' });
       setEditMode(false);
     } catch (e2) {
@@ -222,109 +265,192 @@ export default function Profile() {
   const qDone = profile.questionnaireDone;
 
   return (
-    <Box className="container" sx={{ mt: 3, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>Area personale</Typography>
+    <Box className="container" sx={{ mt: 3, maxWidth: 1100, mx: 'auto' }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h5">Area personale</Typography>
+        <Button
+          startIcon={<EditIcon />}
+          variant="center"
+          onClick={() => setEditMode(true)}
+          disabled={editMode}
+        >
+        
+        </Button>
+      </Stack>
 
       {!profileCompleteLocalFlag && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           <strong>Completa il tuo profilo</strong> per poter prenotare appuntamenti e usare tutte le funzioni.
         </Alert>
       )}
-
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Card principale */}
-      <Paper sx={{ p: 3, maxWidth: 720, ml: 0 }}>
-        <form onSubmit={onSave}>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField label="Nome" value={profile.name} onChange={(e)=>updateField('name', e.target.value)} required fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField label="Cognome" value={profile.surname} onChange={(e)=>updateField('surname', e.target.value)} required fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField label="Data di nascita" type="date" InputLabelProps={{ shrink: true }} value={profile.birthDate} onChange={(e)=>updateField('birthDate', e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField label="Email" type="email" value={profile.email} onChange={(e)=>updateField('email', e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                <TextField label="Password" type="password" value="********" disabled fullWidth />
-                <MuiLink component={RouterLink} to="/forgot-password" variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                  Cambia
-                </MuiLink>
-              </Box>
-            </Grid>
-            <Grid item xs={8}>
-              <TextField label="Città" value={profile.city} onChange={(e)=>updateField('city', e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={4}>
-              <TextField label="CAP" value={profile.cap} onChange={(e)=>updateField('cap', e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={8}>
-              <TextField label="Indirizzo (via)" value={addrStreet} onChange={(e)=>setAddrStreet(e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={4}>
-              <TextField label="Numero civico" value={addrNumber} onChange={(e)=>setAddrNumber(e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField label="Telefono" value={profile.phone} onChange={(e)=>updateField('phone', e.target.value)} fullWidth disabled={!editMode} />
-            </Grid>
-            <Grid item xs={12}>
-              {qDone ? (
-                <Alert severity="success" variant="standard" sx={{ borderRadius: 2, alignItems: 'center' }}>Questionario completato</Alert>
-              ) : (
-                <Alert severity="info" variant="outlined" sx={{ borderRadius: 2 }}>Questionario non completato</Alert>
-              )}
-            </Grid>
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
-                <Button type="button" variant="outlined" onClick={()=>setEditMode(true)} disabled={editMode}>Modifica profilo</Button>
-                <Button type="submit" variant="contained" disabled={!editMode || saving}>{saving ? 'Salvataggio…' : 'Salva modifiche'}</Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </form>
-      </Paper>
+      {/* DATI PERSONALI — layout a 12 colonne con righe simmetriche */}
+      {/* DATI PERSONALI — layout 3 colonne fisse (4/4/4) */}
+<Paper sx={{ p: 3 }}>
+  <form onSubmit={onSave}>
+    <Box
+      sx={{
+        display: 'grid',
+        gap: 2,
+        gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' },
+      }}
+    >
+      {/* helper per posizionare in colonna 4/4/4 */}
+      {/* col1 = 1..4, col2 = 5..8, col3 = 9..12 */}
+      {/* riga indicata da gridRow per mantenere le colonne anche in edit */}
+      {/* RIGA 1 */}
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 1 } }}>
+        <InfoField label="NOME" value={profile.name} onChange={(v)=>updateField('name', v)} editMode={editMode} />
+      </Box>
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 1 } }}>
+        <InfoField label="COGNOME" value={profile.surname} onChange={(v)=>updateField('surname', v)} editMode={editMode} />
+      </Box>
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '9 / span 4' }, gridRow: { md: 1 } }}>
+        <InfoField label="DATA DI NASCITA" value={profile.birthDate} onChange={(v)=>updateField('birthDate', v)} type="date" editMode={editMode} />
+      </Box>
+
+      {/* RIGA 2 */}
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 2 } }}>
+        <InfoField label="EMAIL" value={profile.email} onChange={(v)=>updateField('email', v)} editMode={editMode} />
+      </Box>
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 2 } }}>
+        <InfoPassword label="PASSWORD" value={password} onChange={setPassword} editMode={editMode} />
+      </Box>
+      {/* spacer per tenere la colonna 3 vuota ma allineata */}
+      <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 2 }} />
+
+      {/* RIGA 3 */}
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 3 } }}>
+        <InfoField label="CITTÀ" value={profile.city} onChange={(v)=>updateField('city', v)} editMode={editMode} />
+      </Box>
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 3 } }}>
+        <InfoField label="CAP" value={profile.cap} onChange={(v)=>updateField('cap', v)} editMode={editMode} />
+      </Box>
+      <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 3 }} />
+
+      {/* RIGA 4 */}
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 4 } }}>
+        <InfoField label="INDIRIZZO (VIA)" value={addrStreet} onChange={setAddrStreet} editMode={editMode} />
+      </Box>
+      <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 4 } }}>
+        <InfoField label="NUMERO CIVICO" value={addrNumber} onChange={setAddrNumber} editMode={editMode} />
+      </Box>
+      <Box sx={{ display: { xs: 'none', md: 'block' }, gridColumn: '9 / span 4', gridRow: 4 }} />
+
+      {/* Questionario */}
+      <Box sx={{ gridColumn: '1 / -1', mt: 1 }}>
+        {qDone ? (
+          <Alert severity="success" variant="standard" sx={{ borderRadius: 2 }}>
+            Questionario completato
+          </Alert>
+        ) : (
+          <Alert severity="info" variant="outlined" sx={{ borderRadius: 2 }}>
+            Questionario non completato
+          </Alert>
+        )}
+      </Box>
+    </Box>
+
+    {/* AZIONI — solo in editMode, in basso a destra */}
+    {editMode && (
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Button type="submit" variant="contained" disabled={saving}>
+          {saving ? 'Salvataggio…' : 'Salva modifiche'}
+        </Button>
+      </Box>
+    )}
+  </form>
+</Paper>
 
       {/* Contatti di emergenza */}
-      <Paper sx={{ p: 3, maxWidth: 720, mt: 4, ml: 0 }}>
-        <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>Contatti di emergenza</Typography>
-        {(profile.emergencyContacts || []).map((c, idx) => (
-          <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 2 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <TextField label="Nome e cognome" value={c.name} onChange={(e)=>updateEC(idx,'name', e.target.value)} fullWidth disabled={!editMode} />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField label="Relazione" placeholder="es. Partner" value={c.relation} onChange={(e)=>updateEC(idx,'relation', e.target.value)} fullWidth disabled={!editMode} />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField label="Telefono" value={c.phone} onChange={(e)=>updateEC(idx,'phone', e.target.value)} fullWidth disabled={!editMode} />
-              </Grid>
-              <Grid item xs={12} md={2}>
-                <TextField label="Email (facoltativa)" value={c.email} onChange={(e)=>updateEC(idx,'email', e.target.value)} fullWidth disabled={!editMode} />
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <FormControlLabel
-                  control={<Checkbox checked={!!c.consent} onChange={(e)=>updateEC(idx,'consent', e.target.checked)} disabled={!editMode} />}
-                  label="Autorizzo il terapeuta a contattare questa persona solo in caso di emergenza"
-                />
-              </Grid>
-              <Grid item xs={12} md={2}>
-                <IconButton aria-label="Rimuovi contatto" onClick={()=>removeEC(idx)} disabled={!editMode}><DeleteOutlineIcon /></IconButton>
-              </Grid>
-            </Grid>
-          </Paper>
-        ))}
-        <Button startIcon={<AddIcon />} onClick={addEC} disabled={!editMode || (profile.emergencyContacts || []).length >= 2}>
-          Aggiungi contatto (max 2)
-        </Button>
-      </Paper>
+<Paper sx={{ p: 3, mt: 4 }}>
+  <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>
+    Contatti di emergenza
+  </Typography>
 
-      <Snackbar open={snack.open} autoHideDuration={2500} onClose={()=>setSnack(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+  {(profile.emergencyContacts || []).map((c, idx) => (
+    <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(12, 1fr)' },
+        }}
+      >
+        {/* RIGA 1 */}
+        <Box sx={{ gridColumn: { xs: '1 / -1', md: '1 / span 4' }, gridRow: { md: 1 } }}>
+          <InfoField
+            label="NOME E COGNOME"
+            value={c.name}
+            onChange={(v) => updateEC(idx, 'name', v)}
+            editMode={editMode}
+          />
+        </Box>
+        <Box sx={{ gridColumn: { xs: '1 / -1', md: '5 / span 4' }, gridRow: { md: 1 } }}>
+          <InfoField
+            label="RELAZIONE"
+            value={c.relation}
+            onChange={(v) => updateEC(idx, 'relation', v)}
+            editMode={editMode}
+          />
+        </Box>
+        <Box sx={{ gridColumn: { xs: '1 / -1', md: '9 / span 4' }, gridRow: { md: 1 } }}>
+          <InfoField
+            label="TELEFONO"
+            value={c.phone}
+            onChange={(v) => updateEC(idx, 'phone', v)}
+            editMode={editMode}
+          />
+        </Box>
+
+        {/* RIGA 2: EMAIL (tutta riga) */}
+        <Box sx={{ gridColumn: '1 / -1', gridRow: { md: 2 } }}>
+          <InfoField
+            label="EMAIL (FACOLTATIVA)"
+            value={c.email}
+            onChange={(v) => updateEC(idx, 'email', v)}
+            editMode={editMode}
+          />
+        </Box>
+
+        
+
+        {/* RIGA 4: Azioni (solo in modifica) */}
+        {editMode && (
+          <Box
+            sx={{
+              gridColumn: '1 / -1',
+              gridRow: { md: 4 },
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <IconButton aria-label="Rimuovi contatto" onClick={() => removeEC(idx)}>
+              <DeleteOutlineIcon />
+            </IconButton>
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  ))}
+
+  <Button
+    startIcon={<AddIcon />}
+    onClick={addEC}
+    disabled={!editMode || (profile.emergencyContacts || []).length >= 2}
+  >
+    Aggiungi contatto 
+  </Button>
+</Paper>
+
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={2500}
+        onClose={()=>setSnack(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
         <Alert severity={snack.severity} sx={{ width: '100%' }}>{snack.message}</Alert>
       </Snackbar>
     </Box>
