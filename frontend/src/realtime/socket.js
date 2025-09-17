@@ -4,15 +4,29 @@ import { io } from 'socket.io-client';
 let socket = null;
 
 function resolveSocketUrl() {
+  // 1) usa sempre l'ENV se presente
   const envUrl = import.meta.env?.VITE_SOCKET_URL;
   if (envUrl) return envUrl;
+
+  // 2) fallback: prendi l'origin da VITE_API_BASE_URL (es. https://backend.onrender.com/api -> https://backend.onrender.com)
+  const apiBase = import.meta.env?.VITE_API_BASE_URL;
+  if (apiBase) {
+    try {
+      // new URL consente anche path relativi (se uno dimentica l'http)
+      const u = new URL(apiBase, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+      return u.origin;
+    } catch {/* */}
+  }
+
+  // 3) dev locale
   if (typeof window !== 'undefined') {
-    const { origin } = window.location;
-    if (origin.includes('localhost:5173') || origin.includes('127.0.0.1:5173')) {
+    const { hostname } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:5000';
     }
-    return origin;
   }
+
+  // 4) nessun fallback al dominio Vercel per evitare errori in prod
   return undefined;
 }
 
@@ -23,7 +37,7 @@ export function connectSocket(userId) {
     socket = io(resolveSocketUrl(), {
       withCredentials: true,
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'], // preferisci solo websocket in prod
       autoConnect: true,
       auth: uid ? { userId: uid } : undefined,
       reconnection: true,
@@ -39,24 +53,16 @@ export function connectSocket(userId) {
 
     const fire = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }));
 
-    
     socket.on('appointment:created', (p) => fire('rt:appointment', { kind: 'created', payload: p }));
     socket.on('appointment:updated', (p) => fire('rt:appointment', { kind: 'updated', payload: p }));
     socket.on('appointment:deleted', (p) => fire('rt:appointment', { kind: 'deleted', payload: p }));
     socket.on('appointment:removed', (p) => fire('rt:appointment', { kind: 'removed', payload: p }));
-
-    
     socket.on('notifications:unread', (p) => fire('rt:notifications:unread', p));
   }
 
   if (uid) socket.auth = { userId: uid };
 
-  const doJoin = () => {
-    if (!uid) return;
-    try { socket.emit('join', uid); }
-    catch (err) { if (import.meta.env?.DEV) console.warn('[socket] join failed', err); }
-  };
-
+  const doJoin = () => { if (uid) try { socket.emit('join', uid); } catch {/* */} };
   if (socket.connected) doJoin(); else socket.once('connect', doJoin);
   socket.off('reconnect', doJoin);
   socket.on('reconnect', doJoin);
@@ -66,12 +72,12 @@ export function connectSocket(userId) {
 
 export function disconnectSocket() {
   if (!socket) return;
-  try { socket.removeAllListeners?.(); socket.disconnect?.(); }
-  catch (err) { if (import.meta.env?.DEV) console.warn('[socket] disconnect failed', err); }
+  try { socket.removeAllListeners?.(); socket.disconnect?.(); } catch {/* */}
   socket = null;
 }
 
 export function getSocket() { return socket; }
+
 
 
 
